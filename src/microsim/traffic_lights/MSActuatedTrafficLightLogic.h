@@ -1,6 +1,6 @@
 /****************************************************************************/
 // Eclipse SUMO, Simulation of Urban MObility; see https://eclipse.org/sumo
-// Copyright (C) 2002-2021 German Aerospace Center (DLR) and others.
+// Copyright (C) 2002-2022 German Aerospace Center (DLR) and others.
 // This program and the accompanying materials are made available under the
 // terms of the Eclipse Public License 2.0 which is available at
 // https://www.eclipse.org/legal/epl-2.0/
@@ -160,7 +160,7 @@ protected:
     /// @}
 
     /// @brief recompute running green durations
-    void updateLinkGreenTimes();
+    void updateLinkGreenTimes(std::vector<SUMOTime>& into) const;
 
     /// @brief select among candidate phases based on detector states
     int decideNextPhase();
@@ -226,7 +226,6 @@ protected:
 
     /// @brief last time trySwitch was called
     SUMOTime myLastTrySwitchTime;
-    SUMOTime myLastLinkGreenUpdateTime;
 
     /// @brief consecutive time that the given link index has been green
     std::vector<SUMOTime> myLinkGreenTimes;
