@@ -1,14 +1,14 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-<!-- generated on 2022-01-13 17:09:46 by Eclipse SUMO netedit Version 1.11.0
+<!-- generated on 2022-01-13 18:25:41 by Eclipse SUMO netedit Version 1.11.0
 <configuration xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://sumo.dlr.de/xsd/netconvertConfiguration.xsd">
 
     <input>
-        <sumo-net-file value="/Users/max/Development/tmp/sumo/tests/sumo/basic/tls/actuated/basic/net.net.xml"/>
+        <sumo-net-file value="C:\Users\gle\Documents\tmp\sumo\tests\sumo\basic\tls\NEMA\fixForceOff\4way_error\net.net.xml"/>
     </input>
 
     <output>
-        <output-file value="/Users/max/Development/tmp/sumo/tests/sumo/basic/tls/NEMA/fixForceOff/4way_error/net.net.xml"/>
+        <output-file value="C:\Users\gle\Documents\tmp\sumo\tests\sumo\basic\tls\NEMA\fixForceOff\4way_error\net.net.xml"/>
     </output>
 
     <processing>
@@ -29,10 +29,6 @@
     <pedestrian>
         <walkingareas value="false"/>
     </pedestrian>
-
-    <netedit>
-        <additional-files value="/Users/max/Development/tmp/sumo/tests/sumo/basic/tls/NEMA/fixForceOff/4way_error/detector.add.xml"/>
-    </netedit>
 
     <report>
         <aggregate-warnings value="5"/>
