@@ -115,9 +115,9 @@ public:
 
     std::string combineStates(std::string state1, std::string state2);
 
-    bool isDetectorActivated(int phaseIndex) const;
+    bool isDetectorActivated(int phaseIndex, int ryg = 0) const;
 
-    int nextPhase(std::vector<int> ring, int phaseNum, int& distance);
+    int nextPhase(std::vector<int> ring, int phaseNum, int& distance, int ringNum);
 
     std::tuple<int, int> getNextPhases(int currentR1Index, int currentR2Index, bool toUpdateR1, bool toUpdateR2);
 
@@ -252,6 +252,15 @@ protected:
     */
     std::vector<std::vector<int>> myRingBarrierMapping[2];
 
+    /*
+    Maps one detector state onto another for crossPhaseSwitching
+    {
+     6: 1,
+     2: 5  
+    }
+    */
+    std::map<int, int> crossPhaseSwitchingMap;
+
     // myNextPhase needs to be presevered in memory because the phase is calculated at start of yellow 
     // but not implementend until the end of red 
     int myNextPhaseR1;
@@ -326,6 +335,9 @@ protected:
     /// helps to construct myRingBarrierMapping 
     void constructBarrierMap(int ring, std::vector<std::vector<int>> &barrierMap);
     int findBarrier(int desiredPhase, int ring);
+
+    // construct the cross-phase-switching table
+    std::map<int, int> createCrossPhaseSwitchingMap();
 
     // Green Transfer Option
     bool greenTransfer;

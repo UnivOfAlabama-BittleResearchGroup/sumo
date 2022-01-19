@@ -71,6 +71,7 @@ NEMALogic::NEMALogic(MSTLLogicControl& tlcontrol,
     myVehicleTypes = getParameter("vTypes", "");
     ring1 = getParameter("ring1", "");
     ring2 = getParameter("ring2", "");
+    crossPhaseSwitchingMap = createCrossPhaseSwitchingMap();
 
     std::vector<int> VecMinRecall = readParaFromString(getParameter("minRecall","1,2,3,4,5,6,7,8"));
     for (int i = 0; i < (int)VecMinRecall.size(); i++){
@@ -704,7 +705,7 @@ std::string NEMALogic::combineStates(std::string state1, std::string state2) {
     return output;
 }
 
-bool NEMALogic::isDetectorActivated(int phaseNumber) const{
+bool NEMALogic::isDetectorActivated(int phaseNumber, int ryg) const{
     if ( phase2DetectorMap.find(phaseNumber) == phase2DetectorMap.end() ) {
         return false;
     } 
@@ -713,6 +714,13 @@ bool NEMALogic::isDetectorActivated(int phaseNumber) const{
             if (det->getCurrentVehicleNumber() > 0) {
                 return true;
             }
+        }
+        if ( crossPhaseSwitchingMap.find(phaseNumber) == crossPhaseSwitchingMap.end() ) {
+           return false;
+        }
+        int crossPhaseNum = crossPhaseSwitchingMap.find(phaseNumber)-> second;
+        if (crossPhaseNum > 0 && ryg == 1){
+            return isDetectorActivated(crossPhaseNum, 0);
         }
         return false;
     }
@@ -774,7 +782,7 @@ NEMALogic::NEMA_control() {
         phaseExpectedDuration[R1Index] = MAX2(phaseExpectedDuration[R1Index], minGreen[R1Index]);
     }
     if (((R1Phase != r1coordinatePhase) || (!coordinateMode && vehExt[R1Index] > 0)) && (R1RYG == 1)) {
-        if (isDetectorActivated(R1Phase)) {
+        if (isDetectorActivated(R1Phase, R1RYG)) {
             phaseExpectedDuration[R1Index] = MAX2(phaseExpectedDuration[R1Index], durationR1 + vehExt[R1Index]);
             if(fixForceOff){
                 phaseExpectedDuration[R1Index] = MIN2(phaseExpectedDuration[R1Index], ModeCycle(forceOffs[R1Index]-phaseStartTimeInCycleR1,myCycleLength));
@@ -800,7 +808,7 @@ NEMALogic::NEMA_control() {
         phaseExpectedDuration[R2Index] = MAX2(phaseExpectedDuration[R2Index], minGreen[R2Index]);
     }
     if (((R2Phase != r2coordinatePhase && R2Phase >= 5) || (R2Phase >= 5 && !coordinateMode && vehExt[R2Index] > 0)) && (R2RYG == 1)) {
-        if (isDetectorActivated(R2Phase)) {
+        if (isDetectorActivated(R2Phase, R2RYG)) {
             phaseExpectedDuration[R2Index] = MAX2(phaseExpectedDuration[R2Index], durationR2 + vehExt[R2Index]);
             if (fixForceOff){
                 phaseExpectedDuration[R2Index] = MIN2(phaseExpectedDuration[R2Index], ModeCycle(forceOffs[R2Index]-phaseStartTimeInCycleR2,myCycleLength));
@@ -861,8 +869,8 @@ NEMALogic::NEMA_control() {
             // entry point to green rest. First check detector status, then determine if this should be up next.
             // Green rest is effectively the same as being perpetually past the minimum green timer but not changing
             int d = 0; // we don't care about the distance here
-            int tempR1Phase = nextPhase(rings[0], R1Phase, d);
-            int tempR2Phase = nextPhase(rings[1], R2Phase, d);
+            int tempR1Phase = nextPhase(rings[0], R1Phase, d, 0);
+            int tempR2Phase = nextPhase(rings[1], R2Phase, d, 1);
 
             if ((tempR1Phase == R1Phase) && (tempR2Phase == R2Phase)){
                 // mark that the phases are not desired to end
@@ -905,7 +913,7 @@ NEMALogic::NEMA_control() {
                 // Recalls do take effect here 
                 int barrier = findBarrier(R1Phase, 0);
                 int potentialNextPhase = myRingBarrierMapping[0][barrier].back();
-                if (!isDetectorActivated(potentialNextPhase) && !recall[potentialNextPhase - 1]){
+                if (!isDetectorActivated(potentialNextPhase, R1RYG) && !recall[potentialNextPhase - 1]){
                     EndCurrentPhaseR1 = false;
                     wait4R1Green = false;
                     phaseEndTimeR1 += TS;
@@ -913,7 +921,7 @@ NEMALogic::NEMA_control() {
             }else{
                 int barrier = findBarrier(R2Phase, 1);
                 int potentialNextPhase = myRingBarrierMapping[1][barrier].back();
-                if (!isDetectorActivated(potentialNextPhase) && !recall[potentialNextPhase - 1]){
+                if (!isDetectorActivated(potentialNextPhase, R2RYG) && !recall[potentialNextPhase - 1]){
                     EndCurrentPhaseR2 = false;
                     wait4R2Green = false;
                     phaseEndTimeR2 += TS;
@@ -1033,7 +1041,7 @@ NEMALogic::NEMA_control() {
     return outputState;
 }
 
-int NEMALogic::nextPhase(std::vector<int> ring, int currentPhase, int& distance) {
+int NEMALogic::nextPhase(std::vector<int> ring, int currentPhase, int& distance, int ringNum) {
 
     int length = (int)ring.size();
     int flag = 0;
@@ -1043,7 +1051,7 @@ int NEMALogic::nextPhase(std::vector<int> ring, int currentPhase, int& distance)
         if (flag == 1) {
             if (ring[i % length] != 0) {
                 int tempPhase = ring[i % length];
-                if (recall[tempPhase-1] || isDetectorActivated(tempPhase)){
+                if (recall[tempPhase-1] || isDetectorActivated(tempPhase, ringNum? R2RYG : R1RYG)){
                     nphase=tempPhase;
                     break;
                 }
@@ -1108,25 +1116,25 @@ std::tuple<int, int> NEMALogic::getNextPhases(int R1Phase, int R2Phase, bool toU
     if (!toUpdateR1){
         int r1BarrierNum = findBarrier(R1Phase, 0);
         int d = 0;
-        nextR2Phase = nextPhase(myRingBarrierMapping[1][r1BarrierNum], R2Phase, d);
+        nextR2Phase = nextPhase(myRingBarrierMapping[1][r1BarrierNum], R2Phase, d, 0);
         // If we aren't updating both, the search range is only the subset of values on the same side of the barrier;
     } else if (!toUpdateR2){
         int r2BarrierNum = findBarrier(R2Phase, 1);
         int d = 0;
-        nextR1Phase = nextPhase(myRingBarrierMapping[0][r2BarrierNum], R1Phase, d);
+        nextR1Phase = nextPhase(myRingBarrierMapping[0][r2BarrierNum], R1Phase, d, 1);
     } else {
         // Both can be updated. We should take the change requiring the least distance travelled around the loop, 
         // and then recalculate the other ring if it is not in the same barrier
         int r1Distance = 0;
         int r2Distance = 0;
-        nextR1Phase = nextPhase(rings[0], R1Phase, r1Distance);
-        nextR2Phase = nextPhase(rings[1], R2Phase, r2Distance);
+        nextR1Phase = nextPhase(rings[0], R1Phase, r1Distance, 0);
+        nextR2Phase = nextPhase(rings[1], R2Phase, r2Distance, 1);
         int r1Barrier = findBarrier(nextR1Phase, 0);
         int r2Barrier = findBarrier(nextR2Phase, 1);
         if ((r1Distance <= r2Distance) && (r1Barrier != r2Barrier)){
-            nextR2Phase = nextPhase(myRingBarrierMapping[1][r1Barrier], R2Phase, r2Distance);
+            nextR2Phase = nextPhase(myRingBarrierMapping[1][r1Barrier], R2Phase, r2Distance, 1);
         } else if ((r1Distance > r2Distance) && (r1Barrier != r2Barrier)){
-            nextR1Phase = nextPhase(myRingBarrierMapping[0][r2Barrier], R1Phase, r1Distance);
+            nextR1Phase = nextPhase(myRingBarrierMapping[0][r2Barrier], R1Phase, r1Distance, 0);
         };
     };
     return std::make_tuple(nextR1Phase, nextR2Phase);
@@ -1290,4 +1298,18 @@ NEMALogic::setParameter(const std::string& key, const std::string& value) {
         }
     }
     Parameterised::setParameter(key, value);
+}
+
+std::map<int, int> NEMALogic::createCrossPhaseSwitchingMap(){
+    std::map<int,int> crossPhaseSwitchingMap;
+    for (auto p: readParaFromString(ring1)){
+        std::string cps = "crossPhaseSwitching:";
+        crossPhaseSwitchingMap[p] = StringUtils::toInt(getParameter(cps.append(std::to_string(p)), "0"));
+    }
+    for (auto p: readParaFromString(ring2)){ 
+        // this is probably the wrong way to append strings... Not sure the C++ best practice
+        std::string cps = "crossPhaseSwitching:";
+        crossPhaseSwitchingMap[p] = StringUtils::toInt(getParameter(cps.append(std::to_string(p)), "0"));
+    }
+    return crossPhaseSwitchingMap;
 }
