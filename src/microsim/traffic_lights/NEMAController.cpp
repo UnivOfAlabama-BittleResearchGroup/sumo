@@ -911,15 +911,14 @@ NEMALogic::NEMA_control() {
     // Next Phase should be calculated on the falling edge of yellow
     bool calculate = false;
     if (wait4R1Green || wait4R2Green) {
-        if ((currentTimeInSecond - phaseEndTimeR1 >= yellowTime[R1Index]) && (R1RYG == 0)){
-            R1RYG = -1; //red
+        if ((currentTimeInSecond - phaseEndTimeR1 < yellowTime[R1Index]) && (R1RYG == 1)){
+            R1RYG = 0; //red
             calculate = true;
         }
-        if ((currentTimeInSecond - phaseEndTimeR2 >= yellowTime[R2Index]) && (R2RYG == 0)){
-            R2RYG = -1; //red
+        if ((currentTimeInSecond - phaseEndTimeR2 < yellowTime[R2Index]) && (R2RYG == 1)){
+            R2RYG = 0; //red
             calculate = true;
         }
-
         if (calculate){
             std::tie(myNextPhaseR1, myNextPhaseR2) = getNextPhases(R1Phase, R2Phase, wait4R1Green, wait4R2Green);
         }
