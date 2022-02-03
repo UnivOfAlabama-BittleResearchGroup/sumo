@@ -1613,27 +1613,34 @@ NEMALogic::coordModeCycleTS2(double currentTime, int phase){
 
 bool
 NEMALogic::fitInCycleTS2(int phase, int ringNum){
-    if (!coordinateMode || (R1RYG != GREENREST && R2RYG != GREENREST) || ((phase == r2coordinatePhase) || (phase == r1coordinatePhase))){
+    if (!coordinateMode 
+        || (R1RYG < GREEN && R2RYG < GREEN) 
+        || ((phase == r2coordinatePhase) || (phase == r1coordinatePhase))
+        || ((ringNum == 0 && (R1State != r1coordinatePhase)) || (ringNum == 1 && (R2State != r2coordinatePhase)))){
         return true;
     } else {
         bool iFit = true;
         double currentTime = STEPS2TIME(MSNet::getInstance()->getCurrentTimeStep());
         double timeInCycle = ModeCycle(currentTime - cycleRefPoint - offset, myCycleLength);
         int length = (int)rings[ringNum].size();
-        // Find the path to the coordinate phase. There has to be a more concise way to do this.
+        // Find the path to the coordinate phase
         // Also log the point in front of me. If it can fit, then I should not mark myself as "fitting"
         int proceedingPhase = 0;        
-        for (int i = 0; i < (length * 2 - 1); i++){
-            if (rings[ringNum][(i + 1) % length] == phase){
-                proceedingPhase = rings[ringNum][i % length];
-                break;
+        for (int i = 0; i < (length * 2); i++){
+            if (rings[ringNum][i % length] != 0){ 
+                if ((rings[ringNum][i % length] == phase) && (proceedingPhase != 0)){
+                    break;
+                } else {
+                    proceedingPhase = rings[ringNum][i % length];
+                }
             }
         }
+
         if (proceedingPhase > 0){
             // if the proceeding phase fits, don't say I fit
             double minStartTimeProceeding = forceOffs[proceedingPhase - 1] - maxGreen[proceedingPhase - 1];
             double minStartTime = forceOffs[phase - 1] - maxGreen[phase - 1];
-            if (timeInCycle <= (minStartTimeProceeding > 0? minStartTimeProceeding : myCycleLength + minStartTimeProceeding)){
+            if (timeInCycle <= (minStartTimeProceeding >= 0? minStartTimeProceeding : myCycleLength + minStartTimeProceeding)){
                 iFit = false;
             } else if (timeInCycle > (minStartTime > 0? minStartTime : myCycleLength + minStartTime)){
                 iFit = false;
@@ -1642,4 +1649,3 @@ NEMALogic::fitInCycleTS2(int phase, int ringNum){
         return iFit;
     }
 }
-
