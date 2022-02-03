@@ -945,8 +945,12 @@ NEMALogic::NEMA_control() {
         // Have to do it here and below because the "final" traffic light check is at the end of yellow
         int tempR1Phase;
         int tempR2Phase;
-        // Get the next phases, with the first option being staying in the current phase
-        std::tie(tempR1Phase, tempR2Phase) = getNextPhases(R1Phase, R2Phase, wait4R1Green, wait4R2Green, true);
+        // Get the next phases, with the first option being staying in the current phase. If the next phase has already been determined, use that as the reference
+        std::tie(tempR1Phase, tempR2Phase) = getNextPhases(myNextPhaseR1 == 0 ? R1Phase : myNextPhaseR1, 
+                                                            myNextPhaseR2 == 0 ? R2Phase : myNextPhaseR2, 
+                                                            myNextPhaseR1 == 0 ? wait4R1Green : false, 
+                                                            myNextPhaseR2 == 0 ? wait4R2Green : false, 
+                                                            true);
         // entry point to green rest. First check detector status, then determine if this should be up next.
         // Green rest is effectively the same as being perpetually past the minimum green timer but not changing
         // Green Rest exists in Coordinate Mode too. TS2 allows Green Rest
@@ -1029,9 +1033,16 @@ NEMALogic::NEMA_control() {
             calculate = true;
         }
         if (calculate) {
-            // This forces the decision made in the phase extension logic to stick.
-            if ((myNextPhaseR1 == 0 && wait4R1Green) || (myNextPhaseR2 == 0 && wait4R2Green)){
-                std::tie(myNextPhaseR1, myNextPhaseR2) = getNextPhases(R1Phase, R2Phase, wait4R1Green, wait4R2Green);
+            // This forces the decision made in the phase extension logic to stick. 
+            if ((wait4R1Green) || (wait4R2Green)){
+                int tempNextR1Phase, tempNextR2Phase;
+                std::tie(tempNextR1Phase, tempNextR2Phase) = getNextPhases(R1Phase, R2Phase, wait4R1Green, wait4R2Green);
+                if (wait4R1Green && (tempNextR1Phase != myNextPhaseR1 && tempNextR1Phase != 0)){
+                    myNextPhaseR1 = tempNextR1Phase;
+                }
+                if (wait4R2Green && (tempNextR2Phase != myNextPhaseR2 && tempNextR2Phase != 0)){
+                    myNextPhaseR2 = tempNextR2Phase;
+                }
             }
         }
     }
@@ -1208,14 +1219,6 @@ int NEMALogic::findBarrier(int phase, int ring) {
 
 
 std::tuple<int, int> NEMALogic::getNextPhases(int R1Phase, int R2Phase, bool toUpdateR1, bool toUpdateR2, bool stayOk) {
-    // If myNextPhase has already been set, pass that to the next phase logic. 
-    // If it hasn't (=0) then pass in the current phase
-    R1Phase = myNextPhaseR1 == 0 ? R1Phase : myNextPhaseR1; 
-    R2Phase = myNextPhaseR2 == 0 ? R2Phase : myNextPhaseR2;                
-    // If myNextPhase has already been set, tell the next phase algo that it CANNOT be changed
-    // Aka that wait4Green is false
-    toUpdateR1 = myNextPhaseR1 == 0 ? toUpdateR1 : false; 
-    toUpdateR2 = myNextPhaseR2 == 0 ? toUpdateR2 : false; 
     int nextR1Phase = R1Phase;
     int nextR2Phase = R2Phase;
     int currentR1Barrier = findBarrier(R1Phase, 0);
@@ -1223,11 +1226,15 @@ std::tuple<int, int> NEMALogic::getNextPhases(int R1Phase, int R2Phase, bool toU
     // Only 1 or both can be !toUpdate (otherwise we wouldn't be in this situation)
     if (!toUpdateR1) {
         int d = 0;
-        nextR2Phase = nextPhase(myRingBarrierMapping[1][currentR1Barrier], R2Phase, d, stayOk, 1);
+        // this adds handling for faulty initial conditions
+        int defaultPhase = (currentR2Barrier == currentR1Barrier) ? R2Phase : myRingBarrierMapping[1][currentR1Barrier].back();
+        nextR2Phase = nextPhase(myRingBarrierMapping[1][currentR1Barrier], defaultPhase, d, stayOk, 1);
         // If we aren't updating both, the search range is only the subset of values on the same side of the barrier;
     } else if (!toUpdateR2) {
         int d = 0;
-        nextR1Phase = nextPhase(myRingBarrierMapping[0][currentR2Barrier], R1Phase, d, stayOk, 0);
+        // this adds handling for faulty initial conditions
+        int defaultPhase = (currentR1Barrier == currentR2Barrier) ? R1Phase : myRingBarrierMapping[0][currentR2Barrier].back();
+        nextR1Phase = nextPhase(myRingBarrierMapping[0][currentR2Barrier], defaultPhase, d, stayOk, 0);
     } else {
         // Both can be updated. We should take the change requiring the least distance travelled around the loop,
         // and then recalculate the other ring if it is not in the same barrier
