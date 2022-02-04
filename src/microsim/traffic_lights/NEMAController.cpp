@@ -755,9 +755,12 @@ bool NEMALogic::isDetectorActivated(int phaseNumber, const phaseDetectorInfo &de
                 return false;
             }
         }
-        for (auto det : detectInfo.detectors) {
-            if (det->getCurrentVehicleNumber() > 0) {
-                return true;
+        // Only report myself as active if I am the primary detector or if my cross switch detector is not the active phase
+        if (depth < 1 || ((phaseNumber != R1State) && (phaseNumber != R2State))){
+            for (auto det : detectInfo.detectors) {
+                if (det->getCurrentVehicleNumber() > 0) {
+                    return true;
+                }
             }
         }
         if (detectInfo.cpdSource > 0 && depth < 1){
@@ -1033,17 +1036,25 @@ NEMALogic::NEMA_control() {
             calculate = true;
         }
         if (calculate) {
-            // This forces the decision made in the phase extension logic to stick. 
-            if ((wait4R1Green) || (wait4R2Green)){
-                int tempNextR1Phase, tempNextR2Phase;
-                std::tie(tempNextR1Phase, tempNextR2Phase) = getNextPhases(R1Phase, R2Phase, wait4R1Green, wait4R2Green);
-                if (wait4R1Green && (tempNextR1Phase != myNextPhaseR1 && tempNextR1Phase != 0)){
-                    myNextPhaseR1 = tempNextR1Phase;
-                }
-                if (wait4R2Green && (tempNextR2Phase != myNextPhaseR2 && tempNextR2Phase != 0)){
-                    myNextPhaseR2 = tempNextR2Phase;
-                }
+            // This forces the decision made in the phase extension logic to stick.
+            if ((myNextPhaseR1 == 0 && wait4R1Green) || (myNextPhaseR2 == 0 && wait4R2Green)){
+                std::tie(myNextPhaseR1, myNextPhaseR2) = getNextPhases(
+                        myNextPhaseR1 == 0 ? R1Phase : myNextPhaseR1, 
+                        myNextPhaseR2 == 0 ? R2Phase : myNextPhaseR2, 
+                        myNextPhaseR1 == 0 ? wait4R1Green : false, 
+                        myNextPhaseR2 == 0 ? wait4R2Green : false);
             }
+            // This forces the decision made in the phase extension logic to stick. 
+            // if ((wait4R1Green) || (wait4R2Green)){
+            //     int tempNextR1Phase, tempNextR2Phase;
+            //     std::tie(tempNextR1Phase, tempNextR2Phase) = getNextPhases(R1Phase, R2Phase, wait4R1Green, wait4R2Green);
+            //     if (wait4R1Green && (tempNextR1Phase != myNextPhaseR1 && tempNextR1Phase != 0)){
+            //         myNextPhaseR1 = tempNextR1Phase;
+            //     }
+            //     if (wait4R2Green && (tempNextR2Phase != myNextPhaseR2 && tempNextR2Phase != 0)){
+            //         myNextPhaseR2 = tempNextR2Phase;
+            //     }
+            // }
         }
     }
 
@@ -1621,7 +1632,7 @@ NEMALogic::coordModeCycleTS2(double currentTime, int phase){
 bool
 NEMALogic::fitInCycleTS2(int phase, int ringNum){
     if (!coordinateMode 
-        || (R1RYG < GREEN && R2RYG < GREEN) 
+        || ((R1RYG < GREEN) && (R2RYG < GREEN)) 
         || ((phase == r2coordinatePhase) || (phase == r1coordinatePhase))
         || ((ringNum == 0 && (R1State != r1coordinatePhase)) || (ringNum == 1 && (R2State != r2coordinatePhase)))){
         return true;
@@ -1630,6 +1641,7 @@ NEMALogic::fitInCycleTS2(int phase, int ringNum){
         double currentTime = STEPS2TIME(MSNet::getInstance()->getCurrentTimeStep());
         double timeInCycle = ModeCycle(currentTime - cycleRefPoint - offset, myCycleLength);
         int length = (int)rings[ringNum].size();
+
         // Find the path to the coordinate phase
         // Also log the point in front of me. If it can fit, then I should not mark myself as "fitting"
         int proceedingPhase = 0;        
@@ -1644,12 +1656,23 @@ NEMALogic::fitInCycleTS2(int phase, int ringNum){
         }
 
         if (proceedingPhase > 0){
-            // if the proceeding phase fits, don't say I fit
-            double minStartTimeProceeding = forceOffs[proceedingPhase - 1] - maxGreen[proceedingPhase - 1];
-            double minStartTime = forceOffs[phase - 1] - maxGreen[phase - 1];
-            if (timeInCycle <= (minStartTimeProceeding >= 0? minStartTimeProceeding : myCycleLength + minStartTimeProceeding)){
-                iFit = false;
-            } else if (timeInCycle > (minStartTime > 0? minStartTime : myCycleLength + minStartTime)){
+            // Red is given as lee-way. This is surprising but proven in tests
+            // double endTime = ModeCycle(maxGreen[phase - 1] - redTime[phase - 1] + timeInCycle,  myCycleLength);
+            double d = forceOffs[phase - 1] - timeInCycle + redTime[phase - 1];
+            d = d >= 0? d :  d + myCycleLength;
+            double priorD = forceOffs[proceedingPhase - 1] - timeInCycle - redTime[phase - 1];
+            priorD = priorD >= 0? priorD :  priorD + myCycleLength;
+            // if I am closer to my cuttoff than the prior phase is to it's cutoff
+            // and I can finish my green time by the cuttoff, I can be served
+            if ((d <= priorD) && (d >= maxGreen[phase - 1])){
+                iFit = true;
+            }
+            // I am further away than the prior but it can't fit, then I shouldn't say that I fit.  
+            else if (d > priorD && (priorD <= maxGreen[proceedingPhase - 1])) {
+                iFit = true;
+            }
+            // In all other cases report that I do not fit. 
+            else {
                 iFit = false;
             }
         }
