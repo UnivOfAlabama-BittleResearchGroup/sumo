@@ -328,6 +328,7 @@ protected:
 
     double minGreen[8] {};
     double maxGreen[8] {};
+    double maxGreenMaster[8] {};
     double nextMaxGreen[8] {};
     double vehExt[8] {};
     double yellowTime[8] {};

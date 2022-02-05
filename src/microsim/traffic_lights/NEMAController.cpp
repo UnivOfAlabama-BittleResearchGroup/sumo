@@ -44,8 +44,6 @@
 // ===========================================================================
 // parameter defaults definitions
 // ===========================================================================
-
-
 #define INVALID_POSITION std::numeric_limits<double>::max() // tl added
 
 // #define DEBUG_NEMA
@@ -207,6 +205,7 @@ NEMALogic::constructTimingAndPhaseDefs(){
         minGreen[i] = STEPS2TIME(phase->minDuration);
         maxGreen[i] = STEPS2TIME(phase->maxDuration);
         nextMaxGreen[i] = maxGreen[i];
+        maxGreenMaster[i] = maxGreen[i];
         vehExt[i] = STEPS2TIME(phase->vehext);
         yellowTime[i] = STEPS2TIME(phase->yellow);
         redTime[i] = STEPS2TIME(phase->red);
@@ -749,23 +748,28 @@ std::string NEMALogic::combineStates(std::string state1, std::string state2) {
 }
 
 bool NEMALogic::isDetectorActivated(int phaseNumber, const phaseDetectorInfo &detectInfo, int depth = 0) const{
-        if ((phaseNumber != R1State) && (phaseNumber != R2State) && depth < 1){
-            // If I am not the active phase & my target is an active phase, don't report when I am called for my own phase 
-            if ((detectInfo.cpdTarget == R1State && R1RYG >= GREEN) || (detectInfo.cpdTarget == R2State && R2RYG >= GREEN)){
+        // Handle the non-reporting conditions
+        // if I am checking for myself, and my target is active while I am not, don't report as active.
+        if ((detectInfo.cpdTarget == R1State && R1RYG >= GREEN) 
+            || (detectInfo.cpdTarget == R2State && R2RYG >= GREEN)){
+            if ((phaseNumber != R1State) && (phaseNumber != R2State) && (depth < 1)){
                 return false;
+            } 
+        }
+        // Normal Detector Check
+        for (auto det : detectInfo.detectors) {
+            if (det->getCurrentVehicleNumber() > 0) {
+                return true;
             }
         }
-        // Only report myself as active if I am the primary detector or if my cross switch detector is not the active phase
-        if (depth < 1 || ((phaseNumber != R1State) && (phaseNumber != R2State))){
-            for (auto det : detectInfo.detectors) {
-                if (det->getCurrentVehicleNumber() > 0) {
-                    return true;
-                }
-            }
-        }
-        if (detectInfo.cpdSource > 0 && depth < 1){
+        // If I haven't been reported as false or true yet, check my cross-phase detector, but only if it isn't currently active
+        if ((detectInfo.cpdSource > 0 && depth < 1) 
+            && ((detectInfo.cpdSource != R1State) && (detectInfo.cpdSource != R2State))
+            && ((phaseNumber == R1State && R1RYG >= GREEN) || (phaseNumber == R2State && R2RYG >= GREEN))
+            ){
             return isDetectorActivated(detectInfo.cpdSource, phase2DetectorMap.find(detectInfo.cpdSource) -> second, depth + 1);
         }
+        // Catch All False Return
         return false;
 }
 
@@ -803,14 +807,13 @@ NEMALogic::NEMA_control() {
     //controller starts
     SUMOTime now = MSNet::getInstance()->getCurrentTimeStep();
     double currentTimeInSecond = STEPS2TIME(now);
-
+    double currentInCycleTime = ModeCycle(currentTimeInSecond - cycleRefPoint - offset, myCycleLength);
     // Check the detectors
     checkDetectors();
 
     #ifdef DEBUG_NEMA
     //print to check
     //I didn't use getTimeInCycle(). This is because the cycle reference point may change in the future.
-    double currentInCycleTime = ModeCycle(currentTimeInSecond - cycleRefPoint - offset, myCycleLength);
     std::cout << "current time in cycle:\t" << currentInCycleTime << "\t" << "phases: " << R1State << '\t' << R2State << std::endl;
 #endif
     //int R1Phase = activeRing1Phase;
@@ -949,11 +952,8 @@ NEMALogic::NEMA_control() {
         int tempR1Phase;
         int tempR2Phase;
         // Get the next phases, with the first option being staying in the current phase. If the next phase has already been determined, use that as the reference
-        std::tie(tempR1Phase, tempR2Phase) = getNextPhases(myNextPhaseR1 == 0 ? R1Phase : myNextPhaseR1, 
-                                                            myNextPhaseR2 == 0 ? R2Phase : myNextPhaseR2, 
-                                                            myNextPhaseR1 == 0 ? wait4R1Green : false, 
-                                                            myNextPhaseR2 == 0 ? wait4R2Green : false, 
-                                                            true);
+        std::tie(tempR1Phase, tempR2Phase) = getNextPhases(R1Phase, R2Phase, wait4R1Green, wait4R2Green, true);
+
         // entry point to green rest. First check detector status, then determine if this should be up next.
         // Green rest is effectively the same as being perpetually past the minimum green timer but not changing
         // Green Rest exists in Coordinate Mode too. TS2 allows Green Rest
@@ -1038,23 +1038,8 @@ NEMALogic::NEMA_control() {
         if (calculate) {
             // This forces the decision made in the phase extension logic to stick.
             if ((myNextPhaseR1 == 0 && wait4R1Green) || (myNextPhaseR2 == 0 && wait4R2Green)){
-                std::tie(myNextPhaseR1, myNextPhaseR2) = getNextPhases(
-                        myNextPhaseR1 == 0 ? R1Phase : myNextPhaseR1, 
-                        myNextPhaseR2 == 0 ? R2Phase : myNextPhaseR2, 
-                        myNextPhaseR1 == 0 ? wait4R1Green : false, 
-                        myNextPhaseR2 == 0 ? wait4R2Green : false);
+                std::tie(myNextPhaseR1, myNextPhaseR2) = getNextPhases(R1Phase, R2Phase, wait4R1Green, wait4R2Green);
             }
-            // This forces the decision made in the phase extension logic to stick. 
-            // if ((wait4R1Green) || (wait4R2Green)){
-            //     int tempNextR1Phase, tempNextR2Phase;
-            //     std::tie(tempNextR1Phase, tempNextR2Phase) = getNextPhases(R1Phase, R2Phase, wait4R1Green, wait4R2Green);
-            //     if (wait4R1Green && (tempNextR1Phase != myNextPhaseR1 && tempNextR1Phase != 0)){
-            //         myNextPhaseR1 = tempNextR1Phase;
-            //     }
-            //     if (wait4R2Green && (tempNextR2Phase != myNextPhaseR2 && tempNextR2Phase != 0)){
-            //         myNextPhaseR2 = tempNextR2Phase;
-            //     }
-            // }
         }
     }
 
@@ -1069,27 +1054,39 @@ NEMALogic::NEMA_control() {
             bool toUpdate = (currentTimeInSecond - phaseEndTimeR1) < (yellowTime[R1Index] + TS / 2) ;
             if (R1Phase == r1coordinatePhase && toUpdate) {
                 for (int i = 0; i < 8; i++) {
-                    maxGreen[i] = nextMaxGreen[i];
+                    maxGreenMaster[i] = nextMaxGreen[i];
                 }
                 offset = myNextOffset;
                 myCycleLength = myNextCycleLength;
             }
+            // Reset the closing phase's maxGreen timer to the Master
+            maxGreen[R1Phase - 1] = maxGreenMaster[R1Phase - 1]; 
         } else {
-            //next phase
-            //time 10 R1Phase = 4. Checked
-            // R1Phase = nextPhase(rings[0], R1Phase);
-            R1Phase = myNextPhaseR1;
-            //offset control not included for now
-            R1RYG = GREEN; //green
-            //update phaseStartTime
-            phaseStartTime[R1Phase - 1] = currentTimeInSecond;
-
-            R1State = R1Phase;
-            if (R1Phase == r1coordinatePhase) {
+            
+            if (myNextPhaseR1 == r1coordinatePhase) {
                 if (coordinateMode) {
-                    phaseExpectedDuration[R1Phase - 1] = coordModeCycle(currentTimeInSecond, R1Phase);
+                    phaseExpectedDuration[myNextPhaseR1 - 1] = coordModeCycle(currentTimeInSecond, myNextPhaseR1);
+                }
+            } else {
+                if (coordinateMode && myCabinetType == TS2){
+                    // TS2 in coordinated mode allows phases to be served as long as they can achieve their minimum time.
+                    // We force them to make the split (doesn't affect fix force off) by ending the phase at it's forceOff.
+                    if (fixForceOff){
+                        // Let it use the remaining time in 
+                        maxGreen[myNextPhaseR1 - 1] = ModeCycle(forceOffs[myNextPhaseR1 - 1] - currentInCycleTime, myCycleLength);
+                        // Add the last phase's remaining time onto my max time. 
+                        maxGreen[myNextPhaseR1 - 1] += MAX2(0.0, maxGreen[R1Phase - 1] - (currentInCycleTime - ModeCycle(phaseStartTime[R1Phase - 1], myCycleLength)));
+                    } else {
+                        // I have to be off by my fix force off
+                        maxGreen[myNextPhaseR1 - 1] = MIN2(maxGreenMaster[myNextPhaseR1 - 1], ModeCycle(forceOffs[myNextPhaseR1 - 1] - currentInCycleTime, myCycleLength));
+                    }
+                    
                 }
             }
+            R1Phase = myNextPhaseR1;
+            R1RYG = GREEN;
+            phaseStartTime[R1Phase - 1] = currentTimeInSecond;
+            R1State = R1Phase;
             wait4R1Green = false;
             myNextPhaseR1 = 0;
         }
@@ -1100,18 +1097,32 @@ NEMALogic::NEMA_control() {
             R2RYG = YELLOW;
         } else if ((currentTimeInSecond - phaseEndTimeR2) < (yellowTime[R2Index] + redTime[R2Index])) {
             R2RYG = RED;
+            // Reset the maxGreen to the master maxGreen time
+            maxGreen[R2Phase - 1] = maxGreenMaster[R2Phase - 1];
         } else {
-            R2Phase = myNextPhaseR2;
-            // R2Phase = nextPhase(rings[1], R2Phase);
-            R2RYG = GREEN;
-            //update phaseStartTime
-            phaseStartTime[R2Phase - 1] = currentTimeInSecond;
-            R2State = R2Phase;
-            if (R2Phase == r2coordinatePhase) {
+            if (myNextPhaseR2 == r2coordinatePhase) {
                 if (coordinateMode) {
-                    phaseExpectedDuration[R2Phase - 1] = coordModeCycle(currentTimeInSecond, R2Phase);
+                    phaseExpectedDuration[myNextPhaseR2 - 1] = coordModeCycle(currentTimeInSecond, myNextPhaseR2);
+                }
+            } else {
+                if (coordinateMode && myCabinetType == TS2){
+                    // TS2 in coordinated mode allows phases to be served as long as they can achieve their minimum time.
+                    // We force them to make the split (doesn't affect fix force off) by ending the phase at it's forceOff.
+                    if (fixForceOff){
+                        // Let it use the remaining time in 
+                        maxGreen[myNextPhaseR2 - 1] = ModeCycle(forceOffs[myNextPhaseR2 - 1] - currentInCycleTime, myCycleLength);
+                        // Add the last phase's remaining time onto my max time. 
+                        maxGreen[myNextPhaseR2 - 1] += MAX2(0.0, maxGreen[R2Phase - 1] - (currentInCycleTime - ModeCycle(phaseStartTime[R2Phase - 1], myCycleLength)));
+                    } else {
+                        // I have to be off by my fix force off
+                        maxGreen[myNextPhaseR2 - 1] = MIN2(maxGreenMaster[myNextPhaseR2 - 1], ModeCycle(forceOffs[myNextPhaseR2 - 1] - currentInCycleTime, myCycleLength));
+                    }
                 }
             }
+            R2Phase = myNextPhaseR2;
+            R2RYG = GREEN;
+            phaseStartTime[R2Phase - 1] = currentTimeInSecond;
+            R2State = R2Phase;
             wait4R2Green = false;
             myNextPhaseR2 = 0;
         }
@@ -1186,7 +1197,20 @@ int NEMALogic::nextPhase(std::vector<int> ring, int currentPhase, int& distance,
         }
     }
     if (nphase != 0) {
-        return nphase;
+        if (nphase == currentPhase && sameAllowed){
+            return nphase;
+        } else {
+            // Get the next sequential phase.
+            // At this point, i the index for currentPhase, so start there and look for the next sequential
+            // Handle 0 in the ring with the for loop
+            for (i; i < length * 4; i++){
+                distance++;
+                if ((ring[i % length] != currentPhase) && (ring[i % length] != 0)){
+                    return ring[i % length];
+                }
+            }            
+        }
+            
     } else {
         // this should only occur in the subset
         if (sameAllowed) {
@@ -1230,6 +1254,14 @@ int NEMALogic::findBarrier(int phase, int ring) {
 
 
 std::tuple<int, int> NEMALogic::getNextPhases(int R1Phase, int R2Phase, bool toUpdateR1, bool toUpdateR2, bool stayOk) {
+    // If myNextPhase has already been set, pass that to the next phase logic. 
+    // If it hasn't (=0) then pass in the current phase
+    R1Phase = myNextPhaseR1 == 0 ? R1Phase : myNextPhaseR1; 
+    R2Phase = myNextPhaseR2 == 0 ? R2Phase : myNextPhaseR2;                
+    // If myNextPhase has already been set, tell the next phase algo that it CANNOT be changed
+    // Aka that wait4Green is false
+    toUpdateR1 = myNextPhaseR1 == 0 ? toUpdateR1 : false; 
+    toUpdateR2 = myNextPhaseR2 == 0 ? toUpdateR2 : false; 
     int nextR1Phase = R1Phase;
     int nextR2Phase = R2Phase;
     int currentR1Barrier = findBarrier(R1Phase, 0);
@@ -1283,7 +1315,7 @@ std::tuple<int, int> NEMALogic::getNextPhases(int R1Phase, int R2Phase, bool toU
     // Only actually keep the changes if the controller wants to transition the state
     // We must do this because myNextPhaseR<1,2>Phase = 0 is special and indicates that 
     // the next phase should be calculated the next time the phase is up to be checked
-    return std::make_tuple(toUpdateR1 ? nextR1Phase : 0, toUpdateR2 ? nextR2Phase : 0);
+    return std::make_tuple(toUpdateR1 ? nextR1Phase : myNextPhaseR1, toUpdateR2 ? nextR2Phase : myNextPhaseR2);
 }
 
 //b should be the base of mode
@@ -1462,6 +1494,9 @@ NEMALogic::checkDetectors(){
         // I don't need to check again if the detector is already active
         if (!p.second.detectActive){
             p.second.detectActive = isDetectorActivated(p.first, p.second, 0);
+            #ifdef DEBUG_NEMA
+            std::cout << "TL " << myID <<" Detector  "<< p.first <<":  "<< p.second.detectActive <<std::endl;
+            #endif
         }
     }
 }
@@ -1654,21 +1689,23 @@ NEMALogic::fitInCycleTS2(int phase, int ringNum){
                 }
             }
         }
-
         if (proceedingPhase > 0){
             // Red is given as lee-way. This is surprising but proven in tests
             // double endTime = ModeCycle(maxGreen[phase - 1] - redTime[phase - 1] + timeInCycle,  myCycleLength);
-            double d = forceOffs[phase - 1] - timeInCycle + redTime[phase - 1];
+            double d = forceOffs[phase - 1] - timeInCycle;
             d = d >= 0? d :  d + myCycleLength;
-            double priorD = forceOffs[proceedingPhase - 1] - timeInCycle - redTime[phase - 1];
+            double priorD = forceOffs[proceedingPhase - 1] - timeInCycle;
             priorD = priorD >= 0? priorD :  priorD + myCycleLength;
+
             // if I am closer to my cuttoff than the prior phase is to it's cutoff
-            // and I can finish my green time by the cuttoff, I can be served
-            if ((d <= priorD) && (d >= maxGreen[phase - 1])){
+            // and I can finish my min green time by the cuttoff, I can be served
+            if ((d <= priorD) && (d >= (minGreen[phase - 1] + yellowTime[phase - 1] + redTime[phase - 1]))){
                 iFit = true;
             }
-            // I am further away than the prior but it can't fit, then I shouldn't say that I fit.  
-            else if (d > priorD && (priorD <= maxGreen[proceedingPhase - 1])) {
+            // I am further away than the prior but it can fit it's entire maxGreen phase, then I shouldn't say that I can fit
+            // If the prior phase is already active, then I don't care if it can or can't fit, I should report that I can fit.  
+            else if (((d > priorD) && (priorD <= minGreen[proceedingPhase - 1] + yellowTime[proceedingPhase - 1] + redTime[proceedingPhase - 1])) 
+                    || (proceedingPhase == R1State || proceedingPhase == R2State)) {
                 iFit = true;
             }
             // In all other cases report that I do not fit. 
