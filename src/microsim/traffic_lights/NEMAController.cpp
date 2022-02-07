@@ -1066,7 +1066,7 @@ NEMALogic::NEMA_control() {
                     if (!coordinateMode || (myNextPhaseR1 > 0 && (findBarrier(myNextPhaseR1, 0) == findBarrier(tempR1Phase, 0)))){
                         // This captures a behaviour where the next phase was calculate as 3+8. Then at the start of yellow, the 3 vehicle leaves the detector. 
                         // If 4 is active, it should go to 4. If 4 is not active, even though getNextPhases will return 4, it should not go to 4 but instead serve 3 first.
-                        if ((tempR1Distance == 0 || tempR1Distance < myNextPhaseR1Distance) 
+                        if (!coordinateMode || (tempR1Distance == 0 || tempR1Distance < myNextPhaseR1Distance) 
                         || ((tempR1Distance > myNextPhaseR1Distance) && (recall[tempR1Phase - 1] || readDetector(tempR1Phase)))){
                             myNextPhaseR1 = tempR1Phase;
                             myNextPhaseR1Distance = tempR1Distance;
@@ -1075,7 +1075,7 @@ NEMALogic::NEMA_control() {
                 } 
                 if ((myNextPhaseR2 == 0) || ((tempR2Phase != myNextPhaseR2))){
                     if (!coordinateMode || (myNextPhaseR2 > 0 && (findBarrier(myNextPhaseR2, 1) == findBarrier(tempR2Phase, 1)))){
-                        if ((tempR2Distance == 0 || tempR2Distance < myNextPhaseR2Distance) 
+                        if (!coordinateMode || (tempR2Distance == 0 || tempR2Distance < myNextPhaseR2Distance) 
                         || ((tempR2Distance > myNextPhaseR2Distance) && (recall[tempR2Phase - 1] || readDetector(tempR2Phase)))){
                             myNextPhaseR2 = tempR2Phase;
                             myNextPhaseR2Distance = tempR2Distance;
@@ -1220,8 +1220,8 @@ int NEMALogic::nextPhase(std::vector<int> ring, int currentPhase, int& distance,
     int matching_i = 0;
     for (i = 0; i < length * 2; i++) {
         if (flag == 1) {
+            distance ++;
             if (ring[i % length] != 0) {
-                distance ++;
                 int tempPhase = ring[i % length];
                 if (recall[tempPhase-1] || readDetector(tempPhase)){
                     if (fitInCycle(tempPhase, ringNum)){
@@ -1251,8 +1251,8 @@ int NEMALogic::nextPhase(std::vector<int> ring, int currentPhase, int& distance,
             // Handle 0 in the ring with the for loop
             int nPhaseTemp = 0;
             for (i; i < length * 4; i++){
+                distance ++;
                 if (ring[i % length] != 0){
-                    distance++;
                     if (ring[i % length] != currentPhase){
                         nPhaseTemp = ring[i % length];
                         break;
@@ -1342,8 +1342,9 @@ std::tuple<int, int> NEMALogic::getNextPhases(int R1Phase, int R2Phase, int& r1D
         // and then recalculate the other ring if it is not in the same barrier
         int tempR1Distance = 0;
         int tempR2Distance = 0;
-        nextR1Phase = nextPhase(rings[0], R1Phase, tempR1Distance, stayOk, 0);
-        nextR2Phase = nextPhase(rings[1], R2Phase, tempR2Distance, stayOk, 1);
+        // TODO: Changing this stayOk to true could be the cause of issues down the line
+        nextR1Phase = nextPhase(rings[0], R1Phase, tempR1Distance, true, 0);
+        nextR2Phase = nextPhase(rings[1], R2Phase, tempR2Distance, true, 1);
         int localR1Barrier = findBarrier(nextR1Phase, 0);
         int localR2Barrier = findBarrier(nextR2Phase, 1);
 
@@ -1364,12 +1365,12 @@ std::tuple<int, int> NEMALogic::getNextPhases(int R1Phase, int R2Phase, int& r1D
         // recalculated the one with a longer travelled distance 
         else if ((tempR1Distance <= tempR2Distance) && (localR1Barrier != localR2Barrier)) {
             // If I am still green and already at a barrier on the side of the new R1Phase, I cannot transition away from that barrier.
-             if (!coordinateMode && localR2Barrier == currentR2Barrier){
+             if (!coordinateMode && localR2Barrier == currentR2Barrier && tempR2Distance <= tempR1Distance){
                 // Actually give preference to ring 2 here
                 // nextR2Phase = nextR2Phase;
                 nextR1Phase = nextPhase(myRingBarrierMapping[0][localR2Barrier], R1Phase, tempR1Distance, stayOk, 0);
             } 
-            else if (!coordinateMode && localR1Barrier == currentR1Barrier){
+            else if (!coordinateMode && localR1Barrier == currentR1Barrier && tempR1Distance <= tempR2Distance){
                 // Actually give preference to ring 2 here
                 // nextR1Phase = nextR1Phase;
                 nextR2Phase = nextPhase(myRingBarrierMapping[1][localR1Barrier], R2Phase, tempR2Distance, stayOk, 1);
@@ -1386,18 +1387,18 @@ std::tuple<int, int> NEMALogic::getNextPhases(int R1Phase, int R2Phase, int& r1D
             // int defaultPhase = (R1RYG >= GREEN && currentR1Barrier == localR2Barrier) ? R1Phase : myRingBarrierMapping[0][localR2Barrier].back();
             // nextR1Phase = nextPhase(myRingBarrierMapping[0][localR2Barrier], defaultPhase, tempR1Distance, true, 0);
             // If I am still green and already at a barrier on the side of the new R2Phase, I cannot transition away from that barrier.
-            if (!coordinateMode && localR1Barrier == currentR1Barrier){
-                // Actually give preference to ring 2 here
-                // nextR1Phase = R1Phase;
-                nextR2Phase = nextPhase(myRingBarrierMapping[1][localR1Barrier], R2Phase, tempR2Distance, stayOk, 1);
+            // if (!coordinateMode && localR1Barrier == currentR1Barrier){
+            //     // Actually give preference to ring 2 here
+            //     // nextR1Phase = R1Phase;
+            //     nextR2Phase = nextPhase(myRingBarrierMapping[1][localR1Barrier], R2Phase, tempR2Distance, stayOk, 1);
+            // } else {
+            if (R1RYG >= GREEN && ((R1Phase == r1barrier && localR2Barrier == 1) || (R1Phase == r1coordinatePhase && localR2Barrier == 0))){
+                nextR1Phase = R1Phase;
             } else {
-                if (R1RYG >= GREEN && ((R1Phase == r1barrier && localR2Barrier == 1) || (R1Phase == r1coordinatePhase && localR2Barrier == 0))){
-                    nextR1Phase = R1Phase;
-                } else {
-                    int defaultPhase = (R1RYG >= GREEN && currentR1Barrier == localR2Barrier) ? R1Phase : myRingBarrierMapping[0][localR2Barrier].back();
-                    nextR1Phase = nextPhase(myRingBarrierMapping[0][localR2Barrier], defaultPhase, tempR1Distance, true, 0);
-                }
+                int defaultPhase = (R1RYG >= GREEN && currentR1Barrier == localR2Barrier) ? R1Phase : myRingBarrierMapping[0][localR2Barrier].back();
+                nextR1Phase = nextPhase(myRingBarrierMapping[0][localR2Barrier], defaultPhase, tempR1Distance, true, 0);
             }
+            // }
         }
     }
     // Update the straightline distance
@@ -1685,7 +1686,7 @@ NEMALogic::calculateForceOffsTS2(){
 
 void
 NEMALogic::calculateInitialPhases170(){
-    int initialIndexRing [2] = { activeRing1Index, activeRing2Index};
+    int initialIndexRing [2] = {0, 0};
     // calculate initial phases based on in cycle clock
     for (int ringNumber = 0; ringNumber<2;ringNumber++){
         int length = (int)rings[ringNumber].size();
