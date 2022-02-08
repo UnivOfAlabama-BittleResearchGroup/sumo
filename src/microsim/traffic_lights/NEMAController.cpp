@@ -902,17 +902,35 @@ NEMALogic::NEMA_control() {
     }
 
     // catch the falling edge of green rest
-    if ((R1RYG == GREENREST && !wait4R1Green) || (R2RYG == GREENREST && !wait4R2Green)){
+    if ((R1RYG == GREENREST) || (R2RYG == GREENREST) && !coordinateMode){
         // will still allow the phase to be extended with vehicle detection
+        bool flag = false;
         for (auto &p: phase2DetectorMap){
             if (p.first != R1State && p.first != R2State && p.second.detectActive){
-                phaseStartTime[R1Index] = currentTimeInSecond - minGreen[R1Index];
-                phaseStartTime[R2Index] = currentTimeInSecond - minGreen[R2Index];
-                wait4R1Green = false;
-                wait4R2Green = false;
-                R1RYG = GREEN;
-                R2RYG = GREEN;
+                // The ring with the active detector should be set to green transfer. 
+                // The other ring is set to perpetually past the minimum timer.
+               flag = true;
+               if (!wait4R1Green || !wait4R2Green){
+                    // I am using the altered max green timer as the latching state here. 
+                    // This if statement should only be entered on a rising edge of vehicle arrival 
+                   if (!wait4R2Green && maxGreen[R2Index] < (maxGreenMaster[R2Index] + minGreen[R2Index])){
+                        // R2RYG = GREEN;
+                        phaseStartTime[R2Index] = currentTimeInSecond - minGreen[R2Index];
+                        maxGreen[R2Index] = maxGreenMaster[R2Index] + minGreen[R2Index];
+                   } 
+                   if (!wait4R1Green && maxGreen[R1Index] < (maxGreenMaster[R1Index] + minGreen[R1Index])){
+                        // R1RYG = GREEN;
+                        phaseStartTime[R1Index] = currentTimeInSecond - minGreen[R1Index];
+                        maxGreen[R1Index] = maxGreenMaster[R1Index] + minGreen[R1Index];
+                   }
+               }
             }
+        }
+        // If a car left the detector on the side street, reset the max green to the default.
+        // This resets the timer from above. The state will reset to green rest in the algorithm below.
+        if (!flag){
+            maxGreen[R1Index] = maxGreen[R1Index] > maxGreenMaster[R1Index]? maxGreenMaster[R1Index]: maxGreen[R1Index];
+            maxGreen[R2Index] = maxGreen[R2Index] > maxGreenMaster[R2Index]? maxGreenMaster[R2Index]: maxGreen[R2Index];
         }
     }
 
@@ -1047,13 +1065,13 @@ NEMALogic::NEMA_control() {
             std::tie(tempR1Phase, tempR2Phase) = getNextPhases(R1Phase, R2Phase, tempR1Distance, tempR2Distance, wait4R1Green, wait4R2Green);
             if (!wait4R1Green){
                 if ((tempR2Phase != myNextPhaseR2) || (myNextPhaseR2 == 0)){
-                    assert(findBarrier(tempR2Phase, 1) == findBarrier(R2Phase, 1));
+                    assert(findBarrier(tempR2Phase, 1) == findBarrier(R1Phase, 0));
                     myNextPhaseR2 = tempR2Phase;
                     myNextPhaseR2Distance = tempR2Distance;
                 }
             } else if (!wait4R2Green) {
                if ((tempR1Phase != myNextPhaseR1) || (myNextPhaseR1 == 0)){
-                    assert(findBarrier(tempR1Phase, 0) == findBarrier(R1Phase, 0));
+                    assert(findBarrier(tempR1Phase, 0) == findBarrier(R2Phase, 1));
                     myNextPhaseR1 = tempR1Phase;
                     myNextPhaseR1Distance = tempR1Distance;
                 }
@@ -1207,7 +1225,7 @@ NEMALogic::NEMA_control() {
 
     // Clear the Detectors
     clearDetectors();
-
+    assert(findBarrier(R1Phase, 0) == findBarrier(R2Phase, 1));
     myPhase.setName(toString(R1Phase) + "+" + toString(R2Phase));
     return outputState;
 }
@@ -1348,6 +1366,16 @@ std::tuple<int, int> NEMALogic::getNextPhases(int R1Phase, int R2Phase, int& r1D
         int localR1Barrier = findBarrier(nextR1Phase, 0);
         int localR2Barrier = findBarrier(nextR2Phase, 1);
 
+        // Simple Case. 1 + 6 cannot go to 2 + 5 unless in Green Rest. 
+        if (!coordinateMode && (localR1Barrier == localR2Barrier) && (localR2Barrier == currentR2Barrier)){
+            if ((R2Phase == r2coordinatePhase || R2Phase == r2barrier) && (R2RYG == GREEN || R2RYG == GREENTRANSFER)){
+                nextR2Phase = R2Phase; 
+            }
+            if ((R1Phase == r1coordinatePhase || R1Phase == r1barrier) && (R1RYG == GREEN || R1RYG == GREENTRANSFER)){
+                nextR1Phase = R1Phase; 
+            }
+        }
+
         // Barrier Check. The only time that a phase that is at the barrier can move "reverse" away from the barrier (3+8 -> 4+7)
         // Is when in "Green Rest". That has already been calculated by this point, so if 8 has gone yellow -> red, we have to go to the other barrier
         // Check this be asserting that if the R1Phase is at a barrier and it is < GREEN (YELLOW || RED) AND it's desired phase 
@@ -1366,14 +1394,24 @@ std::tuple<int, int> NEMALogic::getNextPhases(int R1Phase, int R2Phase, int& r1D
         else if ((tempR1Distance <= tempR2Distance) && (localR1Barrier != localR2Barrier)) {
             // If I am still green and already at a barrier on the side of the new R1Phase, I cannot transition away from that barrier.
              if (!coordinateMode && localR2Barrier == currentR2Barrier && tempR2Distance <= tempR1Distance){
-                // Actually give preference to ring 2 here
-                // nextR2Phase = nextR2Phase;
-                nextR1Phase = nextPhase(myRingBarrierMapping[0][localR2Barrier], R1Phase, tempR1Distance, stayOk, 0);
+                // Actually give preference to ring 2 here. If R1 is already at the barrier, it cannot move away from the barrier.
+                if ((R1Phase == r1coordinatePhase || R1Phase == r1barrier) && (R1RYG == GREEN || R1RYG == GREENTRANSFER)){
+                    nextR1Phase = R1Phase; 
+                } else {
+                    int tmpStartPhase  = (R1Phase == r1coordinatePhase || R1Phase == r1barrier || R1RYG > GREEN)? 
+                                        myRingBarrierMapping[0][localR2Barrier].front(): myRingBarrierMapping[0][localR2Barrier].back();
+                    nextR1Phase = nextPhase(myRingBarrierMapping[0][localR2Barrier], tmpStartPhase, tempR1Distance, stayOk, 0);
+                }
             } 
             else if (!coordinateMode && localR1Barrier == currentR1Barrier && tempR1Distance <= tempR2Distance){
-                // Actually give preference to ring 2 here
-                // nextR1Phase = nextR1Phase;
-                nextR2Phase = nextPhase(myRingBarrierMapping[1][localR1Barrier], R2Phase, tempR2Distance, stayOk, 1);
+                // Actually give preference to ring 2 here. If R1 is already at the barrier, it cannot move away from the barrier.
+                if ((R2Phase == r2coordinatePhase || R2Phase == r2barrier) && (R2RYG == GREEN || R2RYG == GREENTRANSFER)){
+                    nextR2Phase = R2Phase;
+                } else {
+                    int tmpStartPhase  = (R2Phase == r2coordinatePhase || R2Phase == r2barrier || R2RYG > GREEN)? 
+                                        myRingBarrierMapping[1][localR1Barrier].front(): myRingBarrierMapping[1][localR1Barrier].back();
+                    nextR2Phase = nextPhase(myRingBarrierMapping[1][localR1Barrier], tmpStartPhase, tempR2Distance, stayOk, 1);
+                }
             }
             else{
                 if (R2RYG >= GREEN && ((R2Phase == r2barrier && localR1Barrier == 1) || (R2Phase == r2coordinatePhase && localR1Barrier == 0))){
