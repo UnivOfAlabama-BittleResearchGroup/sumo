@@ -1095,13 +1095,13 @@ NEMALogic::NEMA_control() {
             int tempR2Distance = 0;
             std::tie(tempR1Phase, tempR2Phase) = getNextPhases(R1Phase, R2Phase, tempR1Distance, tempR2Distance, wait4R1Green, wait4R2Green);
             if (!wait4R1Green){
-                if ((tempR2Phase != myNextPhaseR2) || (myNextPhaseR2 == 0)){
+                if (((tempR2Phase != myNextPhaseR2) || (myNextPhaseR2 == 0)) && (tempR2Phase != R2Phase)){
                     assert(findBarrier(tempR2Phase, 1) == findBarrier(R1Phase, 0));
                     myNextPhaseR2 = tempR2Phase;
                     myNextPhaseR2Distance = tempR2Distance;
                 }
             } else if (!wait4R2Green) {
-               if ((tempR1Phase != myNextPhaseR1) || (myNextPhaseR1 == 0)){
+               if (((tempR1Phase != myNextPhaseR1) || (myNextPhaseR1 == 0)) && (tempR1Phase != R1Phase)){
                     assert(findBarrier(tempR1Phase, 0) == findBarrier(R2Phase, 1));
                     myNextPhaseR1 = tempR1Phase;
                     myNextPhaseR1Distance = tempR1Distance;
@@ -1127,18 +1127,18 @@ NEMALogic::NEMA_control() {
                         // Handle Ring 1
                         bool tryR1Switch = false;
                         bool tryR2Switch = false;
-                        if (myNextPhaseR1 == 0){
+                        if (myNextPhaseR1 == 0 && (tempR1Phase != R1Phase)){
                             myNextPhaseR1 = tempR1Phase;
                             myNextPhaseR1Distance = tempR1Distance;
                         }
-                        else if (tempR1Distance == 0 || (tempR1Distance < myNextPhaseR1Distance || (recall[tempR1Phase - 1] || readDetector(tempR1Phase)))){
+                        else if ((tempR1Phase != R1Phase) && (tempR1Distance == 0 || (tempR1Distance < myNextPhaseR1Distance || (recall[tempR1Phase - 1] || readDetector(tempR1Phase))))){
                             tryR1Switch = true;
                         }
-                        if (myNextPhaseR2 == 0){
+                        if (myNextPhaseR2 == 0 && (tempR2Phase != R2Phase)){
                             myNextPhaseR2 = tempR2Phase;
                             myNextPhaseR2Distance = tempR2Distance;
                         }
-                        else if (tempR2Distance == 0 || (tempR2Distance < myNextPhaseR2Distance || (recall[tempR2Phase - 1] || readDetector(tempR2Phase)))){
+                        else if ((tempR2Phase != R2Phase) && (tempR2Distance == 0 || (tempR2Distance < myNextPhaseR2Distance || (recall[tempR2Phase - 1] || readDetector(tempR2Phase))))){
                             tryR2Switch = true;
                         }
 
@@ -1158,7 +1158,7 @@ NEMALogic::NEMA_control() {
                     }
                     // Just the R1 Phase is different 
                     else if ((tempR1Phase != myNextPhaseR1) || (myNextPhaseR1 == 0)){
-                        if ((tmpBarrier1 == findBarrier(myNextPhaseR1, 0)) || myNextPhaseR2 == 0){
+                        if ((tempR1Phase != R1Phase) && ((tmpBarrier1 == findBarrier(myNextPhaseR1, 0)) || myNextPhaseR2 == 0)){
                             if (tempR1Distance == 0 || (tempR1Distance < myNextPhaseR1Distance || (recall[tempR1Phase - 1] || readDetector(tempR1Phase)))){
                                 myNextPhaseR1 = tempR1Phase;
                                 myNextPhaseR1Distance = tempR1Distance;
@@ -1167,8 +1167,8 @@ NEMALogic::NEMA_control() {
                     }
                     // Just the R2Phase is different  
                     else if ((tempR2Phase != myNextPhaseR2) || (myNextPhaseR2 == 0)) {
-                        if ((tmpBarrier2 == findBarrier(myNextPhaseR2, 1)) || myNextPhaseR2 == 0){
-                        if (tempR2Distance == 0 || (tempR2Distance < myNextPhaseR2Distance || (recall[tempR2Phase - 1] || readDetector(tempR2Phase)))){
+                        if ((tempR2Phase != R2Phase) && (tmpBarrier2 == findBarrier(myNextPhaseR2, 1)) || myNextPhaseR2 == 0){
+                            if (tempR2Distance == 0 || (tempR2Distance < myNextPhaseR2Distance || (recall[tempR2Phase - 1] || readDetector(tempR2Phase)))){
                                 myNextPhaseR1 = tempR1Phase;
                                 myNextPhaseR1Distance = tempR1Distance;
                             } 
@@ -1377,7 +1377,7 @@ int NEMALogic::nextPhase(std::vector<int> ring, int currentPhase, int& distance,
             for (i; i < length * 4; i++){
                 distance ++;
                 if (ring[i % length] != 0){
-                    if (ring[i % length] != currentPhase){
+                    if (ring[i % length] != currentPhase && fitInCycle(ring[matching_i % length], ringNum)){
                         nPhaseTemp = ring[i % length];
                         break;
                     }
@@ -1389,13 +1389,13 @@ int NEMALogic::nextPhase(std::vector<int> ring, int currentPhase, int& distance,
         }
     } else {
         // this should only occur in the subset
-        if (sameAllowed) {
+        if (sameAllowed && (fitInCycle(ring[matching_i % length], ringNum))) {
             return ring[matching_i % length];
         } else {
             matching_i++; 
             // Handle 0 phases
             for (matching_i; matching_i < length * 4; matching_i++){
-                if (ring[matching_i % length] != 0){
+                if (ring[matching_i % length] != 0 && fitInCycle(ring[matching_i % length], ringNum)){
                     distance++;
                     break;       
                 }
@@ -1549,16 +1549,16 @@ std::tuple<int, int> NEMALogic::getNextPhases(int R1Phase, int R2Phase, int& r1D
                 if (R2RYG >= GREEN && ((R2Phase == r2barrier && localR1Barrier == 1) || (R2Phase == r2coordinatePhase && localR1Barrier == 0))){
                     nextR2Phase = R2Phase;
                 } else {
-                    int defaultPhase = (R2RYG >= GREEN && currentR2Barrier == localR1Barrier) ? R2Phase : myRingBarrierMapping[1][localR1Barrier].back();
-                    nextR2Phase = nextPhase(myRingBarrierMapping[1][localR1Barrier], defaultPhase, tempR2Distance, true, 1);
+                    int defaultPhase = ((R2RYG >= GREEN && currentR2Barrier == localR1Barrier) || (!stayOk && R2RYG < GREEN)) ? R2Phase : myRingBarrierMapping[1][localR1Barrier].back();
+                    nextR2Phase = nextPhase(myRingBarrierMapping[1][localR1Barrier], defaultPhase, tempR2Distance, stayOk, 1);
                 }
             } 
         } else if ((tempR1Distance > tempR2Distance) && (localR1Barrier != localR2Barrier)) {
             if (R1RYG >= GREEN && ((R1Phase == r1barrier && localR2Barrier == 1) || (R1Phase == r1coordinatePhase && localR2Barrier == 0))){
                 nextR1Phase = R1Phase;
             } else {
-                int defaultPhase = (R1RYG >= GREEN && currentR1Barrier == localR2Barrier) ? R1Phase : myRingBarrierMapping[0][localR2Barrier].back();
-                nextR1Phase = nextPhase(myRingBarrierMapping[0][localR2Barrier], defaultPhase, tempR1Distance, true, 0);
+                int defaultPhase = ((R1RYG >= GREEN && currentR1Barrier == localR2Barrier) || (!stayOk && R1RYG < GREEN)) ? R1Phase : myRingBarrierMapping[0][localR2Barrier].back();
+                nextR1Phase = nextPhase(myRingBarrierMapping[0][localR2Barrier], defaultPhase, tempR1Distance, stayOk, 0);
             }
         }
     }
@@ -1981,9 +1981,9 @@ NEMALogic::fitInCycleTS2(int phase, int ringNum){
             // Calculate the transition time of the proceeding phase:
             double transitionTimes[2] = {0.0, 0.0};
             for (int i = 0; i < 2; ++i){
-                if ((proceedingPhase[i] == R1State) && (R1State < GREEN)){
+                if ((proceedingPhase[i] == R1State) && (R1RYG < GREEN)){
                     transitionTimes[i] = MAX2(0.0, (yellowTime[R1State - 1] + redTime[R1State - 1]) - (currentTime - phaseEndTimeR1));
-                } else if ((proceedingPhase[i] == R2State) && (R2State < GREEN)){
+                } else if ((proceedingPhase[i] == R2State) && (R2RYG < GREEN)){
                     transitionTimes[i] = MAX2(0.0, (yellowTime[R2State - 1] + redTime[R2State - 1]) - (currentTime - phaseEndTimeR2));
                 } else {
                     transitionTimes[i] = yellowTime[proceedingPhase[i] - 1] + redTime[proceedingPhase[i] - 1];
