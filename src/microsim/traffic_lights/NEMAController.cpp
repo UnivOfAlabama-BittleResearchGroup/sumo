@@ -1961,47 +1961,47 @@ NEMALogic::fitInCycleTS2(int phase, int ringNum){
 
         // Find the path to the coordinate phase
         // If the proceeding phase can fit, then I should not mark myself as "fitting".
-        int proceedingPhase[2] = {0, 0};
-        for (int i = 0; i < 2; ++i){
-            const int& nphase = i < 1? phase : proceedingPhase[0];
-            for (int j = 0; j < (length * 2); j++){
-                if (rings[ringNum][i % length] != 0){
-                    if ((rings[ringNum][j % length] == nphase) && (proceedingPhase != 0)){
-                        break;
-                    } else {
-                        proceedingPhase[i] = rings[ringNum][j % length];
-                    }
+        int proceedingPhase = 0;
+        for (int j = 0; j < (length * 2); j++){
+            if (rings[ringNum][j % length] != 0){
+                if ((rings[ringNum][j % length] == phase) && (proceedingPhase != 0)){
+                    break;
+                } else {
+                    proceedingPhase = rings[ringNum][j % length];
                 }
             }
-        }     
+        }
         
-
-        if (proceedingPhase[0] != 0){
+        if (proceedingPhase != 0){
             iFit = false;
             // Calculate the transition time of the proceeding phase:
-            double transitionTimes[2] = {0.0, 0.0};
-            for (int i = 0; i < 2; ++i){
-                if ((proceedingPhase[i] == R1State) && (R1RYG < GREEN)){
-                    transitionTimes[i] = MAX2(0.0, (yellowTime[R1State - 1] + redTime[R1State - 1]) - (currentTime - phaseEndTimeR1));
-                } else if ((proceedingPhase[i] == R2State) && (R2RYG < GREEN)){
-                    transitionTimes[i] = MAX2(0.0, (yellowTime[R2State - 1] + redTime[R2State - 1]) - (currentTime - phaseEndTimeR2));
+            // double transitionTimes[2] = {0.0, 0.0};
+            double transitionTime = 0.0;
+            if (ringNum < 1){
+                if (R1RYG < GREEN){
+                    transitionTime = MAX2(0.0, (yellowTime[R1State - 1] + redTime[R1State - 1]) - (currentTime - phaseEndTimeR1));
                 } else {
-                    transitionTimes[i] = yellowTime[proceedingPhase[i] - 1] + redTime[proceedingPhase[i] - 1];
+                    transitionTime = yellowTime[R1State - 1] + redTime[R1State - 1];
                 }
-            }  
-           
+            } else {
+                if (R2RYG < GREEN){
+                    transitionTime = MAX2(0.0, (yellowTime[R2State - 1] + redTime[R2State - 1]) - (currentTime - phaseEndTimeR2));
+                } else {
+                    transitionTime = yellowTime[R2State - 1] + redTime[R2State - 1];
+                }
+            }
 
             // Red is given as lee-way. This is surprising but proven in tests
             // double endTime = ModeCycle(maxGreen[phase - 1] - redTime[phase - 1] + timeInCycle,  myCycleLength);
             double d = forceOffs[phase - 1] - timeInCycle;
             d = d >= 0? d :  d + myCycleLength;
-            double priorD = forceOffs[proceedingPhase[0] - 1] - timeInCycle;
+            double priorD = forceOffs[proceedingPhase - 1] - timeInCycle;
             priorD = priorD >= 0? priorD :  priorD + myCycleLength;
             // only consider the fit cases if I fit
             // At the coordinated phases?
             // The logic is slightly different for coordinated phases, so the flag below is set.
             bool coordPhasesActive = (R1State == r1coordinatePhase) && (R2State == r2coordinatePhase);
-            if (d >= (minGreen[phase - 1] + transitionTimes[0])){
+            if (d >= (minGreen[phase - 1] + transitionTime)){
                 // If I am inside of my time chunk in the cycle, say that I fit. 
                 if (coordPhasesActive){
                     if (d <= priorD){
@@ -2009,11 +2009,11 @@ NEMALogic::fitInCycleTS2(int phase, int ringNum){
                     }
                     // if the prior phase is closer to it's cutoff than I am to mine, but the prior phase doesn't fit, return that I do fit.
                     // This al 
-                    else if (priorD <= minGreen[proceedingPhase[0] - 1] + transitionTimes[1]){
+                    else if (priorD <= (minGreen[proceedingPhase - 1] + transitionTime)){
                         iFit = true;
                     }
                     // If the proceeding phase is already active, I can automatically go next.
-                    else if ((proceedingPhase[0] == R1State && proceedingPhase[0] != r1coordinatePhase) || (proceedingPhase[0] == R2State && proceedingPhase[0] != r2coordinatePhase)){
+                    else if ((proceedingPhase == R1State && proceedingPhase != r1coordinatePhase) || (proceedingPhase == R2State && proceedingPhase != r2coordinatePhase)){
                         iFit = true;
                     }  
                     // If the current phase is in a transition, then say that I can myself fit, even if a proceeding phase can also fit.
