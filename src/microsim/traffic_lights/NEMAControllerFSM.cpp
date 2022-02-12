@@ -38,7 +38,7 @@
 #include <microsim/output/MSE2Collector.h>
 #include <microsim/output/MSInductLoop.h>
 #include <netload/NLDetectorBuilder.h>
-#include "NEMAController.h"
+#include "NEMAControllerFSM.h"
 
 
 // ===========================================================================
@@ -2063,3 +2063,33 @@ NEMALogic::fitInCycleTS2(int phase, int ringNum){
         return iFit;
     }
 }
+
+
+// ===========================================================================
+// Phase Definitions
+// =========================================================================== 
+Phase::Phase(){
+    myInstance = this;
+}
+
+Phase*
+Phase::getInstance(void) {
+    if (myInstance != nullptr) {
+        return myInstance;
+    }
+    throw ProcessError("The phase has not been constructed yet");
+}
+
+Phase::~Phase(){}
+
+Phase::trySwitch(){
+    for (auto t: myTransitions){
+        t.
+    }
+}
+
+Phase::tick(NEMALogic* controller){
+    // Green Rest
+    if () 
+}
+
