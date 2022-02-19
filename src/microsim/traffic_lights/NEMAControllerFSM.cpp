@@ -784,6 +784,10 @@ NEMALogic::getCurrentPhaseDef() const {
 
 SUMOTime
 NEMALogic::trySwitch() {
+    // Set the current simulation time
+    setCurrentTime();
+
+
     const std::string newState = NEMA_control();
     if (newState != myPhase.getState()) {
         myPhase.setState(newState);
@@ -1952,15 +1956,15 @@ NEMALogic::calculateInitialPhasesTS2(){
 }
 
 double
-NEMALogic::coordModeCycle170(double currentTime, int phase){
-    return ModeCycle(myCycleLength - (currentTime - cycleRefPoint - offset) - yellowTime[phase - 1] - redTime[phase - 1], myCycleLength);  
+NEMALogic::coordModeCycle170(Phase* phase){
+    return ModeCycle(myCycleLength - (simTime - cycleRefPoint - offset) - phase->yellow - phase->red, myCycleLength);  
 }
 
 double
-NEMALogic::coordModeCycleTS2(double currentTime, int phase){
+NEMALogic::coordModeCycleTS2(Phase* phase){
     // This puts the phase green for the rest of the cycle, plus the first bit in which it must be green
     // We don't need the yellow and red here because the force off already incorporates that.
-    return ModeCycle((myCycleLength + forceOffs[phase - 1]) - (currentTime - cycleRefPoint - offset), myCycleLength);
+    return ModeCycle((myCycleLength + phase->yellow) - (simTime - cycleRefPoint - offset), myCycleLength);
 }
 
 bool
@@ -2064,6 +2068,16 @@ NEMALogic::fitInCycleTS2(int phase, int ringNum){
     }
 }
 
+std::vector<Phase *>
+NEMALogic::getPhasesByRing(int ringNum){
+    std::vector<Phase *> phases;
+    for (auto p : myPhaseObjs){
+        if (p->ringNum == ringNum){
+            phases.push_back(p);
+        } 
+    }
+    return phases;
+}
 
 // ===========================================================================
 // Phase Definitions
@@ -2074,22 +2088,331 @@ Phase::Phase(){
 
 Phase*
 Phase::getInstance(void) {
-    if (myInstance != nullptr) {
-        return myInstance;
+    if (this != nullptr) {
+        return this;
     }
     throw ProcessError("The phase has not been constructed yet");
 }
 
 Phase::~Phase(){}
 
-Phase::trySwitch(){
-    for (auto t: myTransitions){
-        t.
+
+void
+Phase::init(NEMALogic* controller){
+    for (auto p: controller->getPhasesByRing(ringNum)){
+        // construct transitions for all potentail movements, including back to myself
+        myTransitions.push_back(
+            PhaseTransitionLogic(this, p)
+        );
     }
 }
 
-Phase::tick(NEMALogic* controller){
-    // Green Rest
-    if () 
+void
+Phase::checkMyDetectors(NEMALogic* controller){
+    // Check my Detectors, only necessary if it isn't currently marked as on
+    if (!myDetectorInfo.detectActive){
+        // If I have a cross phase target and it is active and I am not, save my detector as not active
+        if (myDetectorInfo.cpdTarget != nullptr){
+            if (myDetectorInfo.cpdTarget->getCurrentState() >= LightState::Green){
+                if (myLightState < LightState::Green){
+                    myDetectorInfo.detectActive = false;
+                    return;
+                }
+            } 
+        }
+        // If we make it to this point, check my detector like normal.
+        for (auto& d: myDetectorInfo.detectors){
+            if (d->getCurrentVehicleNumber() > 0){
+                myDetectorInfo.detectActive = true;
+                return;
+            }
+        }
+        // If my detector is not active, check my cross phase 
+        if ((myDetectorInfo.cpdSource != nullptr) && (myLightState >= LightState::Green)){
+            if (myDetectorInfo.cpdSource->getCurrentState() < LightState::Green){
+                for (auto& d: myDetectorInfo.cpdSource->getDetectors()){
+                    if (d->getCurrentVehicleNumber() > 0){
+                        myDetectorInfo.detectActive = true;
+                        return;
+                    }
+                }       
+            }
+        }
+    }
 }
 
+void
+Phase::enter(NEMALogic* controller, Phase* lastPhase){
+    myStartTime = controller->getCurrentTime();
+    myLightState = LightState::Green;
+    myLastPhaseInstance = lastPhase;
+    readyToSwitch = false;
+
+    if (myLastPhaseInstance == this){
+        // If I loop back to myself, then I should either go to green transfer or green rest...
+        // Which one is it....
+        myLightState = LightState::GreenRest;
+    }
+
+    // Calculate the Max Green Time & Expected Duration here:
+    if (controller->coordinateMode){
+        if (coordinatePhase){
+            myExpectedDuration = controller->coordModeCycle(this);
+        } else {
+            // In case the phase is being
+            if (fixForceOff){
+                maxGreenDynamic = controller->ModeCycle(forceOffTime - controller->getCurrentOffsetTime(), controller->getCurrentCycleLength());
+            } else {
+                maxGreenDynamic = MIN2((double)maxDuration, controller->ModeCycle(forceOffTime - controller->getCurrentOffsetTime(), controller->getCurrentCycleLength()));
+            }
+            myExpectedDuration = minDuration;
+        }
+    } 
+    else {
+        myExpectedDuration = minDuration;
+    }
+
+    // Implements the maxRecall functionality
+    if (maxRecall){
+        myExpectedDuration = maxGreenDynamic;
+    }
+    // Set the controller's active phase
+    controller -> setActivePhase(this);
+}
+
+std::vector<Phase *>
+Phase::exit(NEMALogic* controller, Phase* nextPhase){
+    // At the first entry to this transition, the phase will be in green
+    if (myLightState >= LightState::Green){
+        myLastEnd = controller->getCurrentTime();
+        myLightState = LightState::Yellow;
+        transitionActive = true;
+    }
+    else {
+        if (controller->getCurrentTime() - myLastEnd >= (yellow + red)){
+            // triggers the entry to the next target phase.
+            // Returns the return of myself.
+            readyToSwitch = false;
+            transitionActive = false;
+            nextPhase->enter(controller, this);
+            // return {nextPhase};
+
+        } else if (controller->getCurrentTime() - myLastEnd >= yellow){
+            myLightState = LightState::Red;
+        }
+    }
+    // return trySwitch(controller, nextPhase);
+}
+
+
+const double
+Phase::getTransitionTime(NEMALogic* controller){
+    if (!transitionActive){
+        return (double)(yellow + red);
+    } else {
+        return MAX2(0.0, (double)((controller->getCurrentTime() - myLastEnd) - (yellow + red)));  
+    }
+}
+
+
+std::vector<Phase *>
+Phase::update(NEMALogic* controller, Phase* nextPhase){
+    if (nextPhase == this){
+        std::vector<Phase *> nextPhases;
+        // Continuation Logic
+        double duration = controller->getCurrentTime() - myStartTime;
+    
+        // Check the vehicle extension timer
+        myExpectedDuration += calcVehicleExtension(duration);
+        
+        // Check to see if a switch is desired
+        if (duration >= myExpectedDuration){
+            // nextPhases = trySwitch(controller, nextPhase);
+            readyToSwitch = true;
+        } 
+        return nextPhases;
+    } else {
+        // Go through the exit progession
+        exit(controller, nextPhase);
+    }
+}
+
+
+double
+Phase::calcVehicleExtension(double duration){
+    double extTime = 0.0;
+    if (!coordinatePhase && myExpectedDuration < maxGreenDynamic){
+        if (myDetectorInfo.detectActive){
+            extTime = MIN2((double)vehext, maxGreenDynamic - duration);
+        }
+    } 
+    return extTime;
+}
+
+
+std::vector<Phase*>
+Phase::trySwitch(NEMALogic* controller, Phase* nextPhase){
+    std::vector<Phase *> nextPhases;
+    for (auto t: myTransitions){
+        if (t.okay()){
+            nextPhases.push_back(t.getToPhase());
+        }
+    }
+    return nextPhases;
+}
+
+PhaseTransitionLogic::PhaseTransitionLogic (
+    Phase* fromPhase, Phase* toPhase): 
+        distance(0){
+        fromPhase = fromPhase;
+        toPhase = toPhase;
+} 
+    
+
+PhaseTransitionLogic::~PhaseTransitionLogic(){};
+
+bool
+PhaseTransitionLogic::okay(NEMALogic* controller){
+    if (fromPhase->coordinatePhase){
+        return fromCoord(controller);
+    } 
+    else if (fromPhase->isAtBarrier){
+        return fromBarrier(controller);
+    }
+    else if (controller->coordinateMode){
+        // typical coordinate mode transition
+        return coordBase(controller);
+    }
+    else {
+        return freeBase(controller);
+    }
+}
+
+bool
+PhaseTransitionLogic::freeBase(NEMALogic* controller){
+    // Simplest transition logic. Just check if a detector (or recall) is active on that phase and return it
+    return toPhase->callActive();
+}
+
+bool
+PhaseTransitionLogic::coordBase(NEMALogic* controller){
+    // first check if the free logic is upheld
+    if (freeBase(controller)){
+        // Then check if the "to phase" can fit, which means that there is enough time to fit the current transition + the minimum time of the next phase 
+        double transitionTime = fromPhase->getTransitionTime(controller);
+        double timeTillForceOff = controller->ModeCycle(fromPhase->forceOffTime - controller->getTimeInCycle(), controller->getCurrentCycleLength());
+        if (toPhase->minDuration + transitionTime <= timeTillForceOff){
+            return true;
+        }
+    }
+    return false;
+}
+
+
+bool
+PhaseTransitionLogic::fromBarrier(NEMALogic* controller){
+    if (freeBase(controller)){
+        if (fromPhase->barrierNum == toPhase->barrierNum){
+            // same barrier side so we are good.
+            return true;
+        } else {
+            // This is now a barrier cross and we need to make sure that the other phase is also ready to transition
+            if (fromPhase->readyToSwitch && toPhase->readyToSwitch){
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+
+bool
+PhaseTransitionLogic::fromCoord(NEMALogic* controller){
+    if (coordBase(controller)){
+        // have to see if the phase prior to this phase will also fit
+        Phase* priorPhase = toPhase->getSequentialPriorPhase();
+        double timeTillForceOff = controller->ModeCycle(fromPhase->forceOffTime - controller->getTimeInCycle(), controller->getCurrentCycleLength());
+        double transitionTime = fromPhase->getTransitionTime(controller);
+
+        // Determine if the 
+
+        if (toPhase.){
+
+        }
+    }
+}
+
+SUMOTime
+NEMALogic::trySwitch(){
+    // Check the Detectors
+    for (auto& p : myPhaseObjs){
+        p->checkMyDetectors(this);
+    }
+
+    // Update the timing parameters
+    for (auto& p : myActivePhaseObjs){
+        p->update(this);
+    }
+
+    if (myActivePhaseObjs[0]->readyToSwitch || myActivePhaseObjs[1]->readyToSwitch){
+        std::vector<std::vector<PhaseTransitionLogic* >> potentialPhases;
+        // Handle the transtions
+        for (auto p : myActivePhaseObjs){
+            potentialPhases.push_back(p->trySwitch());
+        }
+        
+        // Loop through all of the initially calculated phases and get a list of valid transitions as well as their "distance"
+        // Then sort the list 
+        std::vector<float_t> distances;
+        std::vector<Phase*[2] > transitions;
+        for (const auto& r1_t : potentialPhases[0]){
+            for (const auto& r2_t : potentialPhases[1]){
+                // If the rings are different, add a choice where one of them is the default choice for whatever ring it is
+                // This is not going to account for green xfer in the current iteration
+                if (r1_t->getToPhase()->ringNum == r2_t->getToPhase()->ringNum){
+                    transitions.push_back({r1_t->getToPhase(), r2_t->getToPhase()});
+                    distances.push_back((r1_t->distance + r2_t->distance) / 2);
+                } 
+            }
+        }
+
+        Phase* nextPhases[2] = myActivePhaseObjs;
+
+        // Sort the transitions
+        if (transitions.size() > 0){
+            std::sort(transitions.begin(), transitions.end(), [&](int i, int j) { return distances[i - 1] < distances[j - 1]; });
+            nextPhases[0] = transitions[0][0];
+        }
+
+
+         
+
+
+    }
+     
+}
+
+
+std::vector<std::tuple<Phase *, int>>
+NEMALogic::createPhaseCombinations(std::vector<std::vector<PhaseTransitionLogic* >> phaseTransitions){
+    // From https://stackoverflow.com/a/48271759
+    size_t max = 1;
+    for (auto const &v : phaseTransitions){
+        max *= v.size();
+    }
+
+    for (size_t i=0; i<max; i++) {
+        auto temp = i;
+        for (auto const &vec : phaseTransitions) {
+            auto index = temp % vec.size();
+            temp /= vec.size();
+            std::cout << vec[index] << ' ';
+
+        }
+
+        std::cout << '\n';
+    }
+        
+    
+
+}
