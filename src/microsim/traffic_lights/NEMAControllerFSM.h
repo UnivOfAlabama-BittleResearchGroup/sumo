@@ -38,6 +38,18 @@
 // ===========================================================================
 class NLDetectorBuilder;
 class MSE2Collector;
+class NEMAPhase;
+
+// ===========================================================================
+// Enumeration
+// ===========================================================================
+enum class LightState {
+    Red,
+    Yellow,
+    Green,
+    GreenXfer,
+    GreenRest
+};
 
 // ===========================================================================
 // class definitions
@@ -122,11 +134,9 @@ public:
 
     int nextPhase(std::vector<int> ring, int phaseNum, int& distance,  bool sameAllowed, int ringNum);
 
-    void getNextPhases(std::vector<float_t> &distances, std::vector<Phase*[2] > &transitions);
+    void getNextPhases(std::vector<float_t> &distances, std::vector<PhaseTransitionLogic*[2] > &transitions);
 
     double ModeCycle(double a, double b);
-
-    std::string transitionState(std::string curState, int RYG);
 
     std::set<std::string> getLaneIDsFromNEMAState(std::string state);
 
@@ -167,7 +177,7 @@ public:
 
 
     // General Force Offs Function
-    const double coordModeCycle(Phase* phase)  {
+    const double coordModeCycle(NEMAPhase* phase)  {
         switch (myCabinetType){
             case Type170:
                 return coordModeCycle170(phase);
@@ -183,16 +193,19 @@ public:
     bool coordinateMode;
 
     /// @brief set the active phase
-    inline void setActivePhase(Phase* phase){ myActivePhaseObjs[phase->ringNum] = phase; };
+    inline void setActivePhase(NEMAPhase* phase){ myActivePhaseObjs[phase->ringNum] = phase; };
     
     /// @brief get the active phases
-    inline Phase* getActivePhase(int ringNum){ return myActivePhaseObjs[ringNum]; };
+    inline NEMAPhase* getActivePhase(int ringNum){ return myActivePhaseObjs[ringNum]; };
 
     /// @brief return all phases for a given ring
-    std::vector<Phase *> getPhasesByRing(int ringNum); 
+    std::vector<NEMAPhase*> getPhasesByRing(int ringNum); 
+
+    /// @brief return all phases for a given ring
+    NEMAPhase* getPhaseObj(int phaseNum); 
 
     /// @brief return all Phase objects 
-    inline std::vector<Phase> getPhaseObjs(void) {return myPhaseObjs;}; 
+    inline std::vector<NEMAPhase*> getPhaseObjs(void) {return myPhaseObjs;}; 
 protected:
     /// @brief called at every trySwitch to update the traffic lights
     void update(void);
@@ -202,20 +215,29 @@ protected:
     inline void setCurrentTime(void) {simTime = STEPS2TIME(MSNet::getInstance()->getCurrentTimeStep()); }
 
     /// @brief variable to store the active phases
-    Phase* myActivePhaseObjs[2] = {nullptr, nullptr};
+    NEMAPhase* myActivePhaseObjs[2] = {nullptr, nullptr};
     // This is where the phases ultim   ately live
-    std::vector<Phase> myPhaseObjs;
+    std::vector<NEMAPhase* > myPhaseObjs;
     // Store the default phases for each of the barrier. This is what the controller will transition to if
     // call on just 8, in 2, 6 -> [4, 8] not [3, 8]
     // These are the dual entry phases
-    Phase* defaultBarrierPhases[2][2] = {{nullptr, nullptr}, {nullptr, nullptr}}; 
+    NEMAPhase* defaultBarrierPhases[2][2]; 
 
     /// @brief Measure Distance Between Two Point on the same ring
     int measureRingDistance(int p1, int p2, int ringNum);
 
 
     /// @brief Initializes timing parameters and calculate initial phases
-    void constructTimingAndPhaseDefs();
+    void constructTimingAndPhaseDefs(std::string &barriers, std::string &coordinates, std::string &ring1, std::string &ring2);
+
+    /// @brief Construct the Light String Every Time that there is a change
+    std::string composeLightString();
+
+    /// @brief Helper function to construct the phaseDetector objects
+    void createDetectorObjects();
+
+    /// @brief helper function for finding if vector contains a phase
+    const bool vectorContainsPhase(std::vector<int> v, int phaseNum);
 
     // create a small datatype for mapping detector to phase index
     // This is the one copied from MSActuatedTrafficLightLogic
@@ -232,15 +254,6 @@ protected:
     };
 
     typedef std::vector<std::vector<DetectorInfo*>> detectorMap;
-
-    // Light Head State
-    enum lightState {
-        YELLOW = 0,
-        RED = 1,
-        GREEN = 2,
-        GREENTRANSFER = 3,
-        GREENREST = 4,
-    };
 
     /// @brief return whether there is a major link from the given lane in the given phase
     bool hasMajor(const std::string& state, const LaneVector& lanes) const;
@@ -295,10 +308,6 @@ protected:
     /// Whether detector output separates by vType
     std::string myVehicleTypes;
 
-    //"3,4,1,2"
-    std::string ring1;
-    //"7,8,5,6"
-    std::string ring2;
     /*
     {
         {3,4,1,2},
@@ -306,14 +315,6 @@ protected:
     }
     */
     std::vector<std::vector<int>> rings;
-    // "4,8"
-    std::string barriers;
-    // "2,6"
-    std::string coordinates;
-
-    //size = 2. 0->ring1 1->ring2
-    std::vector<int> barrierPhaseIndecies;
-    std::vector<int> coordinatePhaseIndecies;
 
     /*
     This serves as a mapping to speed up phaseSelection
@@ -399,7 +400,6 @@ protected:
 
     double phaseEndTimeR1, phaseEndTimeR2;
     bool wait4R1Green, wait4R2Green;
-    lightState R1RYG, R2RYG;
     double cycleRefPoint;// missing update
     //activeR1phase
     int R1State, R2State;
@@ -506,9 +506,9 @@ protected:
     }
 
     // TS2 Specific Coordinated Mode Cycle
-    double coordModeCycleTS2(Phase* phase);
+    double coordModeCycleTS2(NEMAPhase* phase);
     // Type170 Specific Coordinated Mode Cycle
-    double coordModeCycle170(Phase* phase);
+    double coordModeCycle170(NEMAPhase* phase);
 
     // TS2 Specific fit in cycle algorithm
     bool fitInCycleTS2(int phase,  int ringNum);
@@ -530,36 +530,31 @@ protected:
     }
 };
 
-enum class LightState {
-	Red,
-	Yellow,
-	Green,
-	GreenXfer,
-    GreenRest
-};
 
-
-struct phaseDetectorInfo {
-    phaseDetectorInfo():
-        detectors(),
-        cpdTarget(),
-        cpdSource(),
-        detectActive(),
-        latching()
-    {}
-    phaseDetectorInfo(bool _latching):
-        latching(_latching)
-    {}
-    std::vector<MSE2Collector*> detectors = {nullptr};
-    Phase* cpdTarget = nullptr;
-    Phase* cpdSource = nullptr;
-    bool detectActive = false;
-    bool latching = false;
-};
-
-
-class Phase: public MSPhaseDefinition {
+// I wanted it to inherit the phase but this complicated things
+class NEMAPhase {
     public:
+        // 
+        typedef struct phaseDetectorInfo {
+            phaseDetectorInfo():
+                detectors(),
+                cpdTarget(),
+                cpdSource(),
+                detectActive(),
+                latching()
+            {}
+            phaseDetectorInfo(bool latching, NEMAPhase* cpdTarget, NEMAPhase* cpdSource):
+                latching(latching),
+                cpdSource(cpdSource),
+                cpdTarget(cpdTarget)
+            {}
+            std::vector<MSE2Collector*> detectors = {nullptr};
+            NEMAPhase* cpdTarget = nullptr;
+            NEMAPhase* cpdSource = nullptr;
+            bool detectActive = false;
+            bool latching = false;
+        };
+
         // #TODO: Update Documentation
         /** @brief Constructor
          * @param[in] phaseName Name of the phase as an integer. Special as it will be used in calculations 
@@ -569,34 +564,42 @@ class Phase: public MSPhaseDefinition {
          * @param[in] delay The time to wait before the first switch
          * @param[in] parameter The parameter to use for tls set-up
          */
-        Phase(const int phaseName,
-              const bool isBarrier,
-              const bool isGreenRest,
-              const bool isCoordinated,
-              const bool minRecall,
-              const bool maxRecall,
-              const bool fixForceOff,
-              const int barrierNum
-              );
+        NEMAPhase(int phaseName,
+                  bool isBarrier,
+                  bool isGreenRest,
+                  bool isCoordinated,
+                  bool minRecall,
+                  bool maxRecall,
+                  bool fixForceOff,
+                  int barrierNum,
+                  int ringNum,
+                  MSPhaseDefinition* phase);
 
         /// @brief Destructor
-        ~Phase();
+        ~NEMAPhase();
+
+        /// @brief to make the deconstructor polymorphic
+        virtual ~NEMAPhase(){};
         
         /// @brief return reference to instance
-        Phase* getInstance();
+        NEMAPhase* getInstance();
 
         // return the current state
         inline LightState getCurrentState() const { return myLightState; }
         inline std::vector<MSE2Collector*> getDetectors() const { return myDetectorInfo.detectors; } 
 
-        // Build a Map of Valid Transitions
-        void init(NEMALogic* controller);
+        
+        /// @brief set the detector vector
+        inline void setDetectors(std::vector<MSE2Collector*> detectors) {myDetectorInfo.detectors = detectors;};
+
+        // Build a Map of Valid Transitions and store the detector-based information
+        void init(NEMALogic* controller,  int crossPhaseTarget, int crossPhaseSource, bool latching);
         
         // update the phase. This checks detectors etc. 
         void update(NEMALogic* controller);
 
         /// @brief phase exit logic
-        void exit(NEMALogic* controller, Phase* nextPhases[2]);
+        void exit(NEMALogic* controller, PhaseTransitionLogic* nextPhases[2]);
         
         /// @brief simple method to check if there is a recall on the phase.
         inline const bool hasRecall(void) { return minRecall || maxRecall; }; 
@@ -627,15 +630,14 @@ class Phase: public MSPhaseDefinition {
         /// @brief stores the force off time in coordinated mode
         double forceOffTime;
 
-        /// @brief set the Light State of the phase.
-        //  This is used to set green rest and green transfer
-        inline void setRYGState(LightState state) {myLightState = state;}
-
         /// @brief accessory method to get the transition time
         const double getTransitionTime(NEMALogic* controller);
 
         /// @brief get the prior phase
-        inline Phase* getSequentialPriorPhase() { return sequentialPriorPhase; };
+        inline NEMAPhase* getSequentialPriorPhase() { return sequentialPriorPhase; };
+        
+        /// @brief set the prior phase
+        inline NEMAPhase* setSequentialPriorPhase(NEMAPhase* priorPhase) { sequentialPriorPhase = priorPhase; };
         
         /// @brief try to calculate the next phases        
         std::vector<PhaseTransitionLogic*> trySwitch(NEMALogic* controller);
@@ -643,15 +645,30 @@ class Phase: public MSPhaseDefinition {
         /// @brief find a transition given the to phase
         PhaseTransitionLogic* getTransition(int toPhase);
 
+        /// Return the ryg light string for the phase
+        std::string& getNEMAState(void);
+
+        /// @brief accessory function to recalculate timing
+        void recalculateTiming(void);
+
+        /// core timing.
+        double yellow;
+        double red;
+        double minDuration;
+        double maxDuration; 
+        double vehExt;
+
     private:
+        // save the core phase
+        MSPhaseDefinition* myCorePhase = nullptr;
+
         // Save my Pointer
-        Phase* myInstance = nullptr;
-        Phase* myLastPhaseInstance = nullptr;
-        Phase* sequentialPriorPhase = nullptr;
+        NEMAPhase* myInstance = nullptr;
+        NEMAPhase* myLastPhaseInstance = nullptr;
+        NEMAPhase* sequentialPriorPhase = nullptr;
 
         // Phase Knowledge Space
         LightState myLightState;
-        NEMALogic* myController;
         phaseDetectorInfo myDetectorInfo;
 
         // Timing Parameters
@@ -660,6 +677,7 @@ class Phase: public MSPhaseDefinition {
         double maxGreenDynamic;
         double myStartTime;
         double myExpectedDuration;
+        double myLastEnd;
 
         // Coordination Parameters
         double maxStartTime;
@@ -671,20 +689,24 @@ class Phase: public MSPhaseDefinition {
         std::vector<PhaseTransitionLogic*> myTransitions;
 
         // entry parameters for the state
-        void enter(NEMALogic* controller, Phase* lastPhase);        
+        void enter(NEMALogic* controller, NEMAPhase* lastPhase);        
         // exit state for the phase
-        std::vector<Phase *> exit(NEMALogic* controller, Phase* nextPhase);
+        std::vector<NEMAPhase *> exit(NEMALogic* controller, NEMAPhase* nextPhase);
 
         // variable to store the 
         bool transitionActive;
+
+        /// @brief pointer to save the last transition
+        PhaseTransitionLogic* lastTransitionDecision;
+        
 };
 
 
 class PhaseTransitionLogic {
     public:
         PhaseTransitionLogic(
-            Phase* fromPhase,
-            Phase* toPhase
+            NEMAPhase* fromPhase,
+            NEMAPhase* toPhase
         );
         
         // Check to see if transition is okay
@@ -701,12 +723,12 @@ class PhaseTransitionLogic {
         /// @brief to make the deconstructor polymorphic
         virtual ~PhaseTransitionLogic(){};
 
-        inline Phase* getToPhase(void) const { return toPhase; };
-        inline Phase* getFromPhase(void) const { return fromPhase; };
+        inline NEMAPhase* getToPhase(void) const { return toPhase; };
+        inline NEMAPhase* getFromPhase(void) const { return fromPhase; };
 
     private:
-        Phase* fromPhase;
-        Phase* toPhase;
+        NEMAPhase* fromPhase;
+        NEMAPhase* toPhase;
         
         /// @brief build the transition logic based on the from and to phase
         void buildLogic(void);
