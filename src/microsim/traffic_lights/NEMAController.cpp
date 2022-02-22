@@ -906,7 +906,7 @@ NEMALogic::NEMA_control() {
     // The maximum timer only starts when there is a car in another lane even if it is less than the minimum timer.
     // **This could be specific to Econolite Controllers** 
     // TODO: Remove the hardcoded phases
-    if ((R1RYG >= GREEN && R1Phase == 2) && (R2RYG >= GREEN && R2Phase == 6) && !coordinateMode){
+    if ((R1RYG >= GREEN && R1Phase == r1coordinatePhase) && (R2RYG >= GREEN && R2Phase == r2coordinatePhase) && !coordinateMode){
         // will still allow the phase to be extended with vehicle detection
         bool flag = false;
         for (auto &p: phase2DetectorMap){

@@ -122,7 +122,7 @@ public:
 
     int nextPhase(std::vector<int> ring, int phaseNum, int& distance,  bool sameAllowed, int ringNum);
 
-    std::tuple<int, int> getNextPhases(int currentR1Index, int currentR2Index, int& r1Distance, int& r2Distance, bool toUpdateR1, bool toUpdateR2, bool stayOk = false);
+    void getNextPhases(std::vector<float_t> &distances, std::vector<Phase*[2] > &transitions);
 
     double ModeCycle(double a, double b);
 
@@ -184,9 +184,15 @@ public:
 
     /// @brief set the active phase
     inline void setActivePhase(Phase* phase){ myActivePhaseObjs[phase->ringNum] = phase; };
+    
+    /// @brief get the active phases
+    inline Phase* getActivePhase(int ringNum){ return myActivePhaseObjs[ringNum]; };
 
     /// @brief return all phases for a given ring
     std::vector<Phase *> getPhasesByRing(int ringNum); 
+
+    /// @brief return all Phase objects 
+    inline std::vector<Phase> getPhaseObjs(void) {return myPhaseObjs;}; 
 protected:
     /// @brief called at every trySwitch to update the traffic lights
     void update(void);
@@ -197,7 +203,16 @@ protected:
 
     /// @brief variable to store the active phases
     Phase* myActivePhaseObjs[2] = {nullptr, nullptr};
-    std::vector<Phase *> myPhaseObjs;
+    // This is where the phases ultim   ately live
+    std::vector<Phase> myPhaseObjs;
+    // Store the default phases for each of the barrier. This is what the controller will transition to if
+    // call on just 8, in 2, 6 -> [4, 8] not [3, 8]
+    // These are the dual entry phases
+    Phase* defaultBarrierPhases[2][2] = {{nullptr, nullptr}, {nullptr, nullptr}}; 
+
+    /// @brief Measure Distance Between Two Point on the same ring
+    int measureRingDistance(int p1, int p2, int ringNum);
+
 
     /// @brief Initializes timing parameters and calculate initial phases
     void constructTimingAndPhaseDefs();
@@ -578,7 +593,10 @@ class Phase: public MSPhaseDefinition {
         void init(NEMALogic* controller);
         
         // update the phase. This checks detectors etc. 
-        std::vector<Phase *> update(NEMALogic* controller, Phase* nextPhase);
+        void update(NEMALogic* controller);
+
+        /// @brief phase exit logic
+        void exit(NEMALogic* controller, Phase* nextPhases[2]);
         
         /// @brief simple method to check if there is a recall on the phase.
         inline const bool hasRecall(void) { return minRecall || maxRecall; }; 
@@ -590,6 +608,7 @@ class Phase: public MSPhaseDefinition {
         void checkMyDetectors(NEMALogic* controller);
 
         // Need-to-know Phase Settings
+        int phaseName;
         bool isAtBarrier;
         bool isGreenRest;
         int barrierNum;
@@ -598,6 +617,9 @@ class Phase: public MSPhaseDefinition {
         bool fixForceOff;
         bool minRecall;
         bool maxRecall;
+
+        /// Need to Know Phase Settings
+        double greenRestTimer;
 
         /// @brief flag to for the supervisory controller to denote whether phase is ready to switch or not.
         bool readyToSwitch;
@@ -615,6 +637,12 @@ class Phase: public MSPhaseDefinition {
         /// @brief get the prior phase
         inline Phase* getSequentialPriorPhase() { return sequentialPriorPhase; };
         
+        /// @brief try to calculate the next phases        
+        std::vector<PhaseTransitionLogic*> trySwitch(NEMALogic* controller);
+        
+        /// @brief find a transition given the to phase
+        PhaseTransitionLogic* getTransition(int toPhase);
+
     private:
         // Save my Pointer
         Phase* myInstance = nullptr;
@@ -625,8 +653,6 @@ class Phase: public MSPhaseDefinition {
         LightState myLightState;
         NEMALogic* myController;
         phaseDetectorInfo myDetectorInfo;
-
-        std::vector<Phase*> trySwitch(NEMALogic* controller, Phase* nextPhase);
 
         // Timing Parameters
         // -----------------
@@ -642,7 +668,7 @@ class Phase: public MSPhaseDefinition {
         double calcVehicleExtension(double currentTime);
 
         // Potential Transition Map
-        std::vector<PhaseTransitionLogic> myTransitions;
+        std::vector<PhaseTransitionLogic*> myTransitions;
 
         // entry parameters for the state
         void enter(NEMALogic* controller, Phase* lastPhase);        
@@ -672,7 +698,11 @@ class PhaseTransitionLogic {
         /// @brief deconstructor
         ~PhaseTransitionLogic();
 
+        /// @brief to make the deconstructor polymorphic
+        virtual ~PhaseTransitionLogic(){};
+
         inline Phase* getToPhase(void) const { return toPhase; };
+        inline Phase* getFromPhase(void) const { return fromPhase; };
 
     private:
         Phase* fromPhase;
@@ -688,6 +718,7 @@ class PhaseTransitionLogic {
         bool freeBase(NEMALogic* controller);
 
         bool coordBase(NEMALogic* controller);
+
 
 };
 
