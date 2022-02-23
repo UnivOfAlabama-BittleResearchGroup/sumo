@@ -474,7 +474,7 @@ protected:
     // TS2 Specific Timing
     void calculateForceOffsTS2();
     // Type170 Specific Timing
-    void calculateForceOffs170(int r1StartIndex = 0, int r2StartIndex = 0);
+    void calculateForceOffs170();
     // General Force Offs Function
     void calculateForceOffs(){
         switch (myCabinetType){
@@ -623,6 +623,7 @@ class NEMAPhase {
 
         /// Need to Know Phase Settings
         double greenRestTimer;
+        double greatestStartTime;
 
         /// @brief flag to for the supervisory controller to denote whether phase is ready to switch or not.
         bool readyToSwitch;
@@ -650,6 +651,9 @@ class NEMAPhase {
 
         /// @brief accessory function to recalculate timing
         void recalculateTiming(void);
+
+        /// @brief Force Enter. This Should only be called at initialization time
+        inline void forceEnter(NEMALogic *controller) { enter(controller, sequentialPriorPhase); };
 
         /// core timing.
         double yellow;
