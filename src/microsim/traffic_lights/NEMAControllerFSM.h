@@ -116,14 +116,6 @@ public:
 
     void setShowDetectors(bool show);
 
-    std::map<int, std::vector<MSE2Collector*>> getPhase2DetectorMap() {
-        std::map<int, std::vector<MSE2Collector*>> temp;
-        for (auto const& detectInfo : phase2DetectorMap) {
-            temp[detectInfo.first] = detectInfo.second.detectors;
-        }
-        return temp;
-    }
-
     /// @brief retrieve all detectors used by this program
     std::map<std::string, double> getDetectorStates() const override;
 
@@ -207,6 +199,14 @@ public:
     /// @brief return all Phase objects 
     inline std::vector<NEMAPhase*> getPhaseObjs(void) {return myPhaseObjs;}; 
 protected:
+    /// offset
+    double offset;
+    double myNextOffset;
+    
+    /// file paths
+    std::string outputStateFilePath;
+    std::ofstream outputStateFile;
+
     /// @brief called at every trySwitch to update the traffic lights
     void update(void);
 
@@ -225,7 +225,6 @@ protected:
 
     /// @brief Measure Distance Between Two Point on the same ring
     int measureRingDistance(int p1, int p2, int ringNum);
-
 
     /// @brief Initializes timing parameters and calculate initial phases
     void constructTimingAndPhaseDefs(std::string &barriers, std::string &coordinates, std::string &ring1, std::string &ring2);
@@ -317,62 +316,6 @@ protected:
     std::vector<std::vector<int>> rings;
 
     /*
-    This serves as a mapping to speed up phaseSelection
-    {
-      {{3, 4}, {1, 2}},
-      {{7, 8}, {5, 6}}
-    }
-    */
-    std::vector<std::vector<int>> myRingBarrierMapping[2];
-
-    // Creating a small extensible datatype for including information about the phase's detectors
-    // this is different than DetectorInfo, as it is per-phase not per-detector.
-    // Purpose is that when we check detectors, we may need to have per-detector settings handy
-    struct phaseDetectorInfo {
-        phaseDetectorInfo():
-            detectors(),
-            cpdTarget(),
-            cpdSource(),
-            detectActive(),
-            latching()
-        {}
-         phaseDetectorInfo(int _cross_phase_source, bool _latching):
-            cpdSource(_cross_phase_source),
-            latching(_latching)
-        {}
-        std::vector<MSE2Collector*> detectors = {nullptr};
-        int cpdTarget = 0;
-        int cpdSource = 0;
-        bool detectActive = false;
-        bool latching = false;
-    };
-
-    bool isDetectorActivated(int phaseNumber, const phaseDetectorInfo &phaseInfo, int depth) const;
-    // myNextPhase needs to be presevered in memory because the phase is calculated at start of yellow 
-    // but not implementend until the end of red 
-    int myNextPhaseR1;
-    int myNextPhaseR1Distance;
-    int myNextPhaseR2;
-    int myNextPhaseR2Distance;
-
-    bool minRecalls[8] {};
-    bool maxRecalls[8] {};
-    bool recall[8] {};
-
-    // std::vector<std::vector<int>> barriers;
-    //init 0 and then 1,2,3,0
-    //redundant need to remove
-    int activeRing1Index;
-    int activeRing2Index;
-    //init 0. 0->barrierPhases; 1->coordinatePhases
-    // bool coordinatePhases;
-
-    //rings[0][activeRing1Index]
-    int activeRing1Phase;
-    //rings[1][activeRing1Index]
-    int activeRing2Phase;
-
-    /*
     {
         {1 : phaseDetectorInfo{
                 detectors: {det1, det2, ...},
@@ -382,44 +325,13 @@ protected:
         {2 : ...
     }
     */
-    std::map<int, phaseDetectorInfo> phase2DetectorMap;
-
-    double minGreen[8] {};
-    double maxGreen[8] {};
-    double maxGreenMaster[8] {};
-    double nextMaxGreen[8] {};
-    double vehExt[8] {};
-    double yellowTime[8] {};
-    double redTime[8] {};
-    double phaseStartTime[8] {};
-    double forceOffs[8] {};
-    double phaseCutOffs[8] {};
-    double phaseExpectedDuration[8] {};
-
-    bool fixForceOff;
-
-    double phaseEndTimeR1, phaseEndTimeR2;
-    bool wait4R1Green, wait4R2Green;
-    double cycleRefPoint;// missing update
-    //activeR1phase
-    int R1State, R2State;
-    double offset;
-    double myNextOffset;
-    int r1barrier, r2barrier;
-    int r1coordinatePhase, r2coordinatePhase;
-
+    // std::map<int, phaseDetectorInfo> phase2DetectorMap;
     std::map<int, std::vector<std::string>> phase2ControllerLanesMap;
 
+    bool fixForceOff;
+    double cycleRefPoint;// missing update
     bool whetherOutputState;
     bool ignoreErrors;
-
-    std::string currentState;
-    std::string currentR1State;
-    std::string currentR2State;
-
-    std::string outputStateFilePath;
-    std::ofstream outputStateFile;
-    
     
     // Cabinet Type
     // #TODO write a parser to convert parameter to type 
@@ -450,13 +362,6 @@ protected:
     /// @brief virtual phase that holds the current state
     MSPhaseDefinition myPhase;
 
-    /// helps to construct myRingBarrierMapping
-    void constructBarrierMap(int ring, std::vector<std::vector<int>>& barrierMap);
-    int findBarrier(int desiredPhase, int ring);
-
-    /// @brief measures the ring distance between two phases
-    int NEMALogic::measureRingDistance(int currentPhase, int nextPhase, int ring);
-
     // Green Transfer Option
     bool greenTransfer;
 
@@ -464,10 +369,9 @@ protected:
     void error_handle_not_set(std::string param_variable, std::string param_name);
     void validate_timing();
 
-    // read All Detectors
-    void checkDetectors();
-    // clear Detectors
-    void clearDetectors();
+    /// @brief implement any changes that may have come via traci
+    void implementTraciChanges(void);
+
     // read 1 detector state
     bool readDetector(int phase);
 
@@ -607,6 +511,10 @@ class NEMAPhase {
         /// @brief simple method to check if there is either a recall or an active detector
         inline const bool callActive(void) { return minRecall || maxRecall || myDetectorInfo.detectActive; };
 
+        /// @brief simple method to check if a detector is active
+        inline const bool detectActive(void) { return myDetectorInfo.detectActive; };
+
+
         // Check Detectors. Called on all phases at every step
         void checkMyDetectors(NEMALogic* controller);
 
@@ -654,12 +562,13 @@ class NEMAPhase {
 
         /// @brief Force Enter. This Should only be called at initialization time
         inline void forceEnter(NEMALogic *controller) { enter(controller, sequentialPriorPhase); };
-
+        
         /// core timing.
         double yellow;
         double red;
         double minDuration;
-        double maxDuration; 
+        double maxDuration;
+        double nextMaxDuration; 
         double vehExt;
 
     private:
@@ -747,35 +656,4 @@ class PhaseTransitionLogic {
 
 
 };
-
-
-
-// class NEMASupervisor {
-//     public:
-//         /// @brief Constructor
-//         NEMASupervisor(
-
-//         );
-
-//         /// @brief Destructor
-//         ~NEMASupervisor();
-        
-//         /// @brief tick the controller, aka move it forward by one simulation step
-//         void tick();
-
-//     private:
-//         // #TODO: is there ever a "Dual Ring" with != 2 rings? 
-//         Phase* activePhases[2] = {nullptr, nullptr}; 
-//         std::vector<std::vector<Phase>> myRings;
-        
-//         // Measure distance between the diagonal. 
-//         // [1] 2  | [3]  4
-//         // 5  [6] |  7  [8]
-//         // 1, 6 -> 3, 8 has the same travelled top to bottom ring, but 3 is closer to the diagonal 
-//         // [1] 2  | [3]  4
-//         //    \------x---x
-//         // 5  [6] |  7  [8] 
-//         int measureDistance(Phase* phases[2]);
-
-// }
 
