@@ -65,8 +65,6 @@ set(microsim_traffic_lights_STAT_SRCS
    MSTrafficLightLogic.h
    NEMAController.cpp
    NEMAController.h
-   NEMAControllerFSM.cpp
-   NEMAControllerFSM.h
 )
 
 add_library(microsim_traffic_lights STATIC ${microsim_traffic_lights_STAT_SRCS})
