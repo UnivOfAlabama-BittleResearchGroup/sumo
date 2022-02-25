@@ -175,9 +175,11 @@ public:
     /// @brief Wrapper Function to Simplify Accessing Time
     inline SUMOTime getCurrentTime(void) const {return simTime; };
     
-    /// @brief Wrapper Function to Simplify Accessing Offset Cycle Time
-    inline SUMOTime getCurrentOffsetTime(void) const {return simTime + myOffset; };
+    // /// @brief Wrapper Function to Simplify Accessing Offset Cycle Time
+    // inline SUMOTime getCurrentOffsetTime(void) const {return simTime - cycleRefPoint - offset; };
 
+    /// @brief override Function to Simplify Accessing Offset Cycle Time
+    inline SUMOTime getTimeInCycle() const { return (simTime - cycleRefPoint - offset) % myCycleLength;};
 
     // General Force Offs Function
     const SUMOTime coordModeCycle(PhasePtr phase)  {
@@ -205,13 +207,16 @@ public:
     std::vector<PhasePtr> getPhasesByRing(int ringNum); 
 
     /// @brief return all phases for a given ring
-    PhasePtr getPhaseObj(int phaseNum); 
+    PhasePtr getPhaseObj(int phaseNum, int ringNum = -1); 
 
     /// @brief return all Phase objects 
     inline std::vector<PhasePtr> getPhaseObjs(void) {return myPhaseObjs;}; 
 
     /// @brief Measure Distance Between Two Points on the same ring
     int measureRingDistance(int p1, int p2, int ringNum);
+
+    /// @brief Check if the controller is a type-170 controller
+    inline bool isType170(void) const {return myCabinetType == Type170; };
 
 protected:
     /// offset
@@ -227,7 +232,7 @@ protected:
 
     /// variable to save time
     SUMOTime simTime = 0;
-    inline void setCurrentTime(void) {simTime = (SUMOTime)STEPS2TIME(MSNet::getInstance()->getCurrentTimeStep()); }
+    inline void setCurrentTime(void) {simTime = MSNet::getInstance()->getCurrentTimeStep(); }
 
     /// @brief variable to store the active phases
     PhasePtr myActivePhaseObjs[2] = {nullptr, nullptr};
@@ -236,7 +241,8 @@ protected:
     // Store the default phases for each of the barrier. This is what the controller will transition to if
     // call on just 8, in 2, 6 -> [4, 8] not [3, 8]
     // These are the dual entry phases
-    PhasePtr defaultBarrierPhases[2][2]; 
+    PhasePtr defaultBarrierPhases[2][2];
+    PhasePtr coordinatePhaseObjs[2];  
 
     /// @brief Initializes timing parameters and calculate initial phases
     void constructTimingAndPhaseDefs(std::string &barriers, std::string &coordinates, std::string &ring1, std::string &ring2);
@@ -536,6 +542,8 @@ class NEMAPhase {
 
         // Check Detectors. Called on all phases at every step
         void checkMyDetectors();
+        // Clear My Detectors. Called on all phases at every step
+        void clearMyDetectors();
 
         // Need-to-know Phase Settings
         int phaseName;
@@ -635,7 +643,7 @@ class PhaseTransitionLogic {
     public:
         /// @brief Typedef for commonly used phase pointer
         typedef NEMAPhase* PhasePtr;
-        
+
         PhaseTransitionLogic(
             PhasePtr fromPhase,
             PhasePtr toPhase

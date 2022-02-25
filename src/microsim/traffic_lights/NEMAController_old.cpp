@@ -1826,7 +1826,6 @@ NEMALogic::calculateForceOffs170(int r1StartIndex, int r2StartIndex){
 
 void
 NEMALogic::clearDetectors(){
-    
     for (auto &p: phase2DetectorMap){
         // If the detector isn't latching then it is marked as off.
         // If it is latching and the current green phase is the latching detectors phase, we can mark it as off as well
