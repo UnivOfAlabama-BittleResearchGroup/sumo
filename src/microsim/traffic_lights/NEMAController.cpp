@@ -1198,7 +1198,7 @@ NEMAPhase::checkMyDetectors(){
 void
 NEMAPhase::enter(NEMALogic* controller, NEMAPhase* lastPhase){
     myStartTime = controller->getCurrentTime();
-    myLightState = LightState::Green;
+    myLightState = (!controller->coordinateMode && isGreenRest)? LightState::GreenRest : LightState::Green;
     myLastPhaseInstance = lastPhase;
     readyToSwitch = false;
     
