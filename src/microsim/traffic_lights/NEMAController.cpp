@@ -1198,9 +1198,17 @@ NEMAPhase::checkMyDetectors(){
 void
 NEMAPhase::enter(NEMALogic* controller, NEMAPhase* lastPhase){
     myStartTime = controller->getCurrentTime();
-    myLightState = (!controller->coordinateMode && isGreenRest)? LightState::GreenRest : LightState::Green;
+    myLightState = LightState::Green;
     myLastPhaseInstance = lastPhase;
     readyToSwitch = false;
+
+    // Handle Green Rest Peculiarities
+    if  (!controller->coordinateMode && isGreenRest){
+        // If the controller is in free mode and the phase is a green rest phase, then it should enter as "green rest"
+        myLightState = LightState::GreenRest;
+        // if the phase has "green rest" capabilities, set it's timer to the dynamic maxGreen  
+        greenRestTimer = maxDuration * isGreenRest;
+    }
     
     // clear the last transition decision
     lastTransitionDecision = nullptr;
@@ -1313,8 +1321,10 @@ NEMAPhase::update(NEMALogic* controller){
         }
         if (!vehicleActive){
             greenRestTimer = maxDuration;
-            myStartTime = controller->getCurrentTime() - minDuration;
-            myExpectedDuration = minDuration;
+            if (duration >= minDuration){
+                myStartTime = controller->getCurrentTime() - minDuration;
+                myExpectedDuration = minDuration;
+            }
         }
 
         if (greenRestTimer < DELTA_T){
