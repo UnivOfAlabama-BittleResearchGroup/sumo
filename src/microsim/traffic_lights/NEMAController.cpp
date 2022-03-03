@@ -1156,7 +1156,7 @@ NEMAPhase::getNEMAState() {
 
 void
 NEMAPhase::clearMyDetectors(){
-    if ((!myDetectorInfo.latching) || (myLightState < LightState::Green)){
+    if ((!myDetectorInfo.latching) || (myLightState >= LightState::Green)){
         myDetectorInfo.detectActive = false;
     } 
 }
@@ -1276,7 +1276,8 @@ NEMAPhase::exit(NEMALogic* controller, PhaseTransitionLogic* nextPhases[2]){
         } else {
             myLightState = LightState::GreenXfer;
             // In green transfer, the phase will last as long as the other phase.
-            myExpectedDuration = otherPhase->myExpectedDuration;
+            // this needs to not blindly copy, but instead be a calculation
+            myExpectedDuration = (otherPhase->myExpectedDuration + otherPhase->myStartTime) - myStartTime;
         }
     }
 }
@@ -1375,14 +1376,20 @@ NEMAPhase::trySwitch(NEMALogic* controller){
         // only try to switch if I am ready to switch
         for (auto &t: myTransitions){
             if (t->okay(controller)){
-                nextTransitions.push_back(t);
-                // break once there is a valid option (they have already been sorted)
-                break;
+                if (lastTransitionDecision != nullptr){
+                    if (t->getToPhase()->barrierNum == lastTransitionDecision->getToPhase()->barrierNum){
+                        nextTransitions.push_back(t);
+                        break;    
+                    }
+                } else {
+                    nextTransitions.push_back(t);
+                    // break once there is a valid option (they have already been sorted)
+                    break;
+                }
             }
         }   
     }
-    // Give preference to the last transition decision, 
-    // but only need to add it if it is not in the list AND if nothing in the list is the same barrier as it was.
+    // Give preference to the last transition decision 
     if (lastTransitionDecision != nullptr){
         bool found = false;
         bool sameBarrier = false;
@@ -1393,8 +1400,10 @@ NEMAPhase::trySwitch(NEMALogic* controller){
             }
             if (t->getToPhase()->barrierNum == lastTransitionDecision->getToPhase()->barrierNum){
                 sameBarrier = true;
+                break;
             }
         }
+        // but only need to add it if it is not in the list AND if nothing in the list is the same barrier as it was.
         if (!found && !sameBarrier){
             nextTransitions.push_back(lastTransitionDecision);
         }
