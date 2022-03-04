@@ -218,6 +218,9 @@ public:
     /// @brief Check if the controller is a type-170 controller
     inline bool isType170(void) const {return myCabinetType == Type170; };
 
+    /// @brief return a pointer to the opposite phase
+    PhasePtr getOtherPhase(PhasePtr p);
+
 protected:
     /// offset
     SUMOTime offset;
@@ -350,6 +353,9 @@ protected:
     SUMOTime cycleRefPoint;// missing update
     bool whetherOutputState;
     bool ignoreErrors;
+
+    /// @brief Get the 
+    PhaseTransitionLogic* getDefaultTransition(PhaseTransitionLogic* t, PhaseTransitionLogic* ot); 
     
     // Cabinet Type
     // #TODO write a parser to convert parameter to type 
@@ -652,9 +658,10 @@ class PhaseTransitionLogic {
         // Check to see if transition is okay
         bool okay(NEMALogic* controller);
 
-        // distance between the phases
+        const int getDistance(void);
+        inline void setDistance(int d) { distance = d; };
         int distance;
-
+        
         /// @brief deconstructor
         ~PhaseTransitionLogic();
 

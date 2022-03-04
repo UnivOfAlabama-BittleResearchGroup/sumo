@@ -46,7 +46,7 @@
 // ===========================================================================
 #define INVALID_POSITION std::numeric_limits<double>::max() // tl added
 
-#define DEBUG_NEMA
+// #define DEBUG_NEMA
 
 // ===========================================================================
 // method definitions
@@ -967,7 +967,7 @@ NEMALogic::calculateInitialPhases170(){
             // This handles the wrap around
             SUMOTime syntheticPriorStart =  p->getSequentialPriorPhase()->greatestStartTime < p->greatestStartTime ? 
                 p->getSequentialPriorPhase()->greatestStartTime : p->getSequentialPriorPhase()->greatestStartTime - myCycleLength;
-            if (cycleTime <= p->greatestStartTime && cycleTime > syntheticPriorStart){
+            if (cycleTime <= ModeCycle(p->greatestStartTime, myCycleLength) && cycleTime > ModeCycle(syntheticPriorStart, myCycleLength)){
                 found = true;
                 activePhases[i] = p;
                 break;
@@ -975,15 +975,15 @@ NEMALogic::calculateInitialPhases170(){
         }
         if (!found){
             const std::string error = "I can't find the correct phase for NEMA tlLogic '" + getID() + "' Ring " + toString(i) + " to start in.";
-            if (ignoreErrors) {
-                WRITE_WARNING(error);
-                WRITE_WARNING("I am starting in the coordinated phases");
-                activePhases[0] = coordinatePhaseObjs[0];
-                activePhases[1] = coordinatePhaseObjs[1];        
-                break;
-            } else {
-                throw ProcessError(error);
-            }
+            // if (ignoreErrors) {
+            WRITE_WARNING(error);
+            WRITE_WARNING("I am starting in the coordinated phases");
+            activePhases[0] = defaultBarrierPhases[0][0];
+            activePhases[1] = defaultBarrierPhases[1][0];        
+            //     break;
+            // } else {
+            //     throw ProcessError(error);
+            // }
         }
     }
 
@@ -1040,6 +1040,11 @@ NEMALogic::getDetectorStates() const {
         result[item.first->getID()] = item.first->getCurrentVehicleNumber();
     }
     return result;
+}
+
+NEMALogic::PhasePtr 
+NEMALogic::getOtherPhase(PhasePtr p){
+    return myActivePhaseObjs[!p->ringNum]; 
 }
 
 // ===========================================================================
@@ -1104,10 +1109,10 @@ NEMAPhase::init(NEMALogic* controller, int crossPhaseTarget, int crossPhaseSourc
     for (auto p: controller->getPhasesByRing(ringNum)){
         // construct transitions for all potentail movements, including back to myself
         myTransitions.push_back(new PhaseTransitionLogic(this, p));
-        myTransitions.back()->distance = controller->measureRingDistance(phaseName, p->phaseName, ringNum);
+        myTransitions.back()->setDistance(controller->measureRingDistance(phaseName, p->phaseName, ringNum));
     }
 
-    // sort the transitions by distance for speed later
+    // sort the transitions by distance for speed later. Using plain distance here
     std::sort(myTransitions.begin(), myTransitions.end(), [&](const auto *i, const auto *j) { return i->distance < j->distance; });
 
     // create the phase detector info
@@ -1260,7 +1265,7 @@ NEMAPhase::exit(NEMALogic* controller, PhaseTransitionLogic* nextPhases[2]){
         }
     } else {
         // This is the entry to green rest or green transfer
-        NEMAPhase* otherPhase = controller->getActivePhase(!ringNum);
+        NEMAPhase* otherPhase = controller->getOtherPhase(this);
         readyToSwitch = false;
         if ((nextPhases[!ringNum]->getToPhase() == otherPhase && otherPhase->readyToSwitch)
             // if the other phase is already in green rest and I am in green transfer but there are no cars on the side streets, 
@@ -1275,9 +1280,11 @@ NEMAPhase::exit(NEMALogic* controller, PhaseTransitionLogic* nextPhases[2]){
             greenRestTimer = maxDuration * isGreenRest;
         } else {
             myLightState = LightState::GreenXfer;
-            // In green transfer, the phase will last as long as the other phase.
-            // this needs to not blindly copy, but instead be a calculation
-            myExpectedDuration = (otherPhase->myExpectedDuration + otherPhase->myStartTime) - myStartTime;
+            if (isAtBarrier){
+                // In green transfer, the phase will last as long as the other phase.
+                // this needs to not blindly copy, but instead be a calculation
+                myExpectedDuration = (otherPhase->myExpectedDuration + otherPhase->myStartTime) - myStartTime;
+            } 
         }
     }
 }
@@ -1319,7 +1326,7 @@ NEMAPhase::update(NEMALogic* controller){
         bool vehicleActive = false;
         for (auto &p : controller->getPhaseObjs()){
             if ((p->phaseName != phaseName) 
-                && (p->phaseName != controller->getActivePhase(!ringNum)->phaseName) 
+                && (p->phaseName != controller->getOtherPhase(this)->phaseName) 
                 && p->myDetectorInfo.detectActive){
                 greenRestTimer -= DELTA_T;
                 vehicleActive = true;
@@ -1338,7 +1345,7 @@ NEMAPhase::update(NEMALogic* controller){
         if (greenRestTimer < DELTA_T){
             readyToSwitch = true;
             // force the counterparty to be ready to switch too. This needs to be latching....
-            controller->getActivePhase(!ringNum)->readyToSwitch = true;
+            controller->getOtherPhase(this)->readyToSwitch = true;
         }
 
         // Special Behavior when the Green Rest Circles all the way around in coordinated mode
@@ -1419,7 +1426,6 @@ NEMAPhase::trySwitch(NEMALogic* controller){
 // ===========================================================================
 // PhaseTransitionLogic Definitions
 // =========================================================================== 
-
 PhaseTransitionLogic::PhaseTransitionLogic (
     NEMAPhase* fromPhase, NEMAPhase* toPhase): 
         distance(0),
@@ -1456,7 +1462,7 @@ PhaseTransitionLogic::freeBase(NEMALogic* controller){
     bool okay = false;
     if (toPhase->callActive()){
         if (fromPhase->barrierNum != toPhase->barrierNum){
-            PhasePtr otherPhase = controller->getActivePhase(!fromPhase->ringNum);
+            PhasePtr otherPhase = controller->getOtherPhase(fromPhase);
             // If it is a barrier cross, the cross is only allowed if the transition times are ==
             if (otherPhase->readyToSwitch && otherPhase->getTransitionTime(controller) == fromPhase->getTransitionTime(controller)){
                 okay = true;
@@ -1471,7 +1477,7 @@ PhaseTransitionLogic::freeBase(NEMALogic* controller){
 bool
 PhaseTransitionLogic::coordBase(NEMALogic* controller){
     if (toPhase->coordinatePhase && 
-        (controller->getActivePhase(!fromPhase->ringNum)->readyToSwitch || fromPhase->barrierNum == toPhase->barrierNum)){
+        (controller->getOtherPhase(fromPhase)->readyToSwitch || fromPhase->barrierNum == toPhase->barrierNum)){
         // transitions TO the coordinated phase may always happen, as long as the other phase is okay to switch too
         return true;
     }
@@ -1504,7 +1510,7 @@ PhaseTransitionLogic::fromBarrier(NEMALogic* controller){
             return true;
         } else {
             // This is now a barrier cross and we need to make sure that the other phase is also ready to transition
-            if (fromPhase->readyToSwitch && controller->getActivePhase(!(fromPhase->ringNum))->readyToSwitch){
+            if (fromPhase->readyToSwitch && controller->getOtherPhase(fromPhase)->readyToSwitch){
                 return true;
             }
         }
@@ -1518,7 +1524,7 @@ PhaseTransitionLogic::fromCoord(NEMALogic* controller){
     if (coordBase(controller)){
         // Determine if the other phase is also ready to switch
         // TODO: Do I need to ensure that they have ended at the same time here?  
-        if (controller->getActivePhase(!(fromPhase->ringNum))->readyToSwitch){
+        if (controller->getOtherPhase(fromPhase)->readyToSwitch){
             // Dr. Wang had the Type-170 code setup in a way that it could transition whenever - meaning that it didn't matter if the prior phase could fit or not
             if (controller->isType170()){
                 return true;
@@ -1537,6 +1543,16 @@ PhaseTransitionLogic::fromCoord(NEMALogic* controller){
     return false;
 }
 
+const int
+PhaseTransitionLogic::getDistance(void){
+    // Returns a 0 during certain green 2 green situations
+    if (toPhase == fromPhase){
+        if (toPhase->getCurrentState() == LightState::Green){
+            return 0;
+        }
+    } 
+    return distance;
+}
 
 // ===========================================================================
 // NEMALogic Definitions
@@ -1556,6 +1572,17 @@ NEMALogic::getPhaseObj(int phaseNum, int ringNum){
     return myPhaseObjs.front();
 }
 
+PhaseTransitionLogic*
+NEMALogic::getDefaultTransition(PhaseTransitionLogic* t, PhaseTransitionLogic* ot){
+    NEMAPhase* p = t->getFromPhase(); 
+    if (!p->readyToSwitch || 
+        (p->barrierNum == ot->getToPhase()->barrierNum && p->getCurrentState() >= LightState::Green))
+        {
+            return p->getTransition(p->phaseName);
+    } else {
+        return p->getTransition(defaultBarrierPhases[p->ringNum][ot->getToPhase()->barrierNum]->phaseName);
+    }
+}
 
 void
 NEMALogic::getNextPhases(TransitionPairs &transitions){
@@ -1568,30 +1595,26 @@ NEMALogic::getNextPhases(TransitionPairs &transitions){
         for (const auto &r1_t : potentialPhases[0]){
             for (const auto &r2_t : potentialPhases[1]){
                 if (r1_t->getToPhase()->barrierNum == r2_t->getToPhase()->barrierNum){
-                    transitions.push_back({r1_t, r2_t, (float)(r1_t->distance + r2_t->distance) / 2});
+                    transitions.push_back({r1_t, r2_t, (float)(r1_t->getDistance() + r2_t->getDistance()) / 2});
                 } 
                 else {
                     // If the rings are different, add a choice where one of them is the default choice for whatever ring it is
                     // create two choices, one for each of the phase as they are on  different rings
                     if (r1_t->getFromPhase()->readyToSwitch){
                         // get the r2 default 
-                        PhaseTransitionLogic* r2_t_temp = r2_t->getFromPhase()->readyToSwitch? 
-                            myActivePhaseObjs[1]->getTransition(defaultBarrierPhases[1][r1_t->getToPhase()->barrierNum]->phaseName) : r2_t;
-
+                        PhaseTransitionLogic* r2_t_temp = getDefaultTransition(r2_t, r1_t);
                         // only add it if it does not cross a barrier!
                         if (r2_t_temp->getToPhase()->barrierNum == r1_t->getToPhase()->barrierNum){
-                            transitions.push_back({r1_t, r2_t_temp, (float)(r2_t_temp->distance + r1_t->distance) / 2});
+                            transitions.push_back({r1_t, r2_t_temp, (float)(r2_t_temp->getDistance() + r1_t->getDistance()) / 2});
                         }
                     }
 
                     if (r2_t->getFromPhase()->readyToSwitch){
                         // R1 default 
-                        PhaseTransitionLogic* r1_t_temp = r1_t->getFromPhase()->readyToSwitch? 
-                            myActivePhaseObjs[0]->getTransition(defaultBarrierPhases[0][r2_t->getToPhase()->barrierNum]->phaseName) : r1_t;
-
+                        PhaseTransitionLogic* r1_t_temp = getDefaultTransition(r1_t, r2_t);
                         // only add it if it does not cross a barrier!
                         if (r1_t_temp->getToPhase()->barrierNum == r2_t->getToPhase()->barrierNum){
-                            transitions.push_back({r1_t_temp, r2_t, (float)(r2_t->distance + r1_t_temp->distance) / 2});
+                            transitions.push_back({r1_t_temp, r2_t, (float)(r2_t->getDistance() + r1_t_temp->getDistance()) / 2});
                         }
                     }
                     // If the distances are <= 1, this means that this is the shortest transition possible 
