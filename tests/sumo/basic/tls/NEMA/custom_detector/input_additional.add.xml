@@ -4,7 +4,6 @@
     <laneAreaDetector id="customDet3" lane="17276_2" pos="5" endPos="15" file="detector.xml" freq="600"/>
     <laneAreaDetector id="customDet4" lane="17276_3" pos="5" endPos="15" file="detector.xml" freq="600"/>
 
-
     <tlLogic id="2881" offset="10" programID="NEMA" type="NEMA">
         <param key="detector-length" value="20"/>
         <param key="detector-length-leftTurnLane" value="10"/>
