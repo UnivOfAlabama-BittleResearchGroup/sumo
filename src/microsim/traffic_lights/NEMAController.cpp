@@ -1544,11 +1544,11 @@ PhaseTransitionLogic::fromCoord(NEMALogic* controller){
 }
 
 const int
-PhaseTransitionLogic::getDistance(void){
+PhaseTransitionLogic::getDistance(PhaseTransitionLogic* otherTrans){
     // Returns a 0 during certain green 2 green situations
-    if (toPhase == fromPhase){
-        if (toPhase->getCurrentState() == LightState::Green){
-            return 0;
+    if ((toPhase == fromPhase) && (otherTrans->toPhase->barrierNum == toPhase->barrierNum)){
+        if (toPhase->getCurrentState() == LightState::Green || toPhase->getCurrentState() == LightState::GreenXfer){
+            return otherTrans->distance;
         }
     } 
     return distance;
@@ -1595,7 +1595,7 @@ NEMALogic::getNextPhases(TransitionPairs &transitions){
         for (const auto &r1_t : potentialPhases[0]){
             for (const auto &r2_t : potentialPhases[1]){
                 if (r1_t->getToPhase()->barrierNum == r2_t->getToPhase()->barrierNum){
-                    transitions.push_back({r1_t, r2_t, (float)(r1_t->getDistance() + r2_t->getDistance()) / 2});
+                    transitions.push_back({r1_t, r2_t, (float)(r1_t->getDistance(r2_t) + r2_t->getDistance(r1_t)) / 2});
                 } 
                 else {
                     // If the rings are different, add a choice where one of them is the default choice for whatever ring it is
@@ -1605,7 +1605,7 @@ NEMALogic::getNextPhases(TransitionPairs &transitions){
                         PhaseTransitionLogic* r2_t_temp = getDefaultTransition(r2_t, r1_t);
                         // only add it if it does not cross a barrier!
                         if (r2_t_temp->getToPhase()->barrierNum == r1_t->getToPhase()->barrierNum){
-                            transitions.push_back({r1_t, r2_t_temp, (float)(r2_t_temp->getDistance() + r1_t->getDistance()) / 2});
+                            transitions.push_back({r1_t, r2_t_temp, (float)(r2_t_temp->getDistance(r1_t) + r1_t->getDistance(r2_t_temp)) / 2});
                         }
                     }
 
@@ -1614,7 +1614,7 @@ NEMALogic::getNextPhases(TransitionPairs &transitions){
                         PhaseTransitionLogic* r1_t_temp = getDefaultTransition(r1_t, r2_t);
                         // only add it if it does not cross a barrier!
                         if (r1_t_temp->getToPhase()->barrierNum == r2_t->getToPhase()->barrierNum){
-                            transitions.push_back({r1_t_temp, r2_t, (float)(r2_t->getDistance() + r1_t_temp->getDistance()) / 2});
+                            transitions.push_back({r1_t_temp, r2_t, (float)(r2_t->getDistance(r1_t_temp) + r1_t_temp->getDistance(r2_t)) / 2});
                         }
                     }
                     // If the distances are <= 1, this means that this is the shortest transition possible 

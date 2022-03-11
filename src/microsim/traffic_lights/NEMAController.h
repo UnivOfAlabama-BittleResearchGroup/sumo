@@ -658,10 +658,10 @@ class PhaseTransitionLogic {
         // Check to see if transition is okay
         bool okay(NEMALogic* controller);
 
-        const int getDistance(void);
+        const int getDistance(PhaseTransitionLogic* otherTrans);
         inline void setDistance(int d) { distance = d; };
         int distance;
-        
+
         /// @brief deconstructor
         ~PhaseTransitionLogic();
 
