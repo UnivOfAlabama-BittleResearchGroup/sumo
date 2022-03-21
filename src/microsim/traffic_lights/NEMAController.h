@@ -527,6 +527,9 @@ class NEMAPhase {
         /// @brief set the detector vector
         inline void setDetectors(std::vector<MSE2Collector*> detectors) {myDetectorInfo.detectors = detectors;};
 
+        /// @brief is a transition active?
+        inline bool isTransitionActive() const {return myLightState < LightState::Green; }
+
         // Build a Map of Valid Transitions and store the detector-based information
         void init(NEMALogic* controller,  int crossPhaseTarget, int crossPhaseSource, bool latching);
         

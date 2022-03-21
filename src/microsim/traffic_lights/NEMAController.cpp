@@ -1333,6 +1333,11 @@ NEMAPhase::update(NEMALogic* controller){
                 break;
             }
         }
+        // catch the rising edge of the sidestreet detection and calculate the maximum timer
+        if (vehicleActive && (greenRestTimer + DELTA_T >= maxDuration)){
+            maxGreenDynamic = minDuration + maxDuration;
+        }
+
         if (!vehicleActive){
             greenRestTimer = maxDuration;
             if (duration >= minDuration){
@@ -1529,6 +1534,12 @@ PhaseTransitionLogic::fromCoord(NEMALogic* controller){
             if (controller->isType170()){
                 return true;
             }
+
+            // If the transition is already active, then report that the movement is possible
+            if (fromPhase->isTransitionActive()){
+                return true;
+            }
+
             // now determine if there my prior phase can fit or not. We already know that I can fit.
             NEMAPhase* priorPhase = toPhase->getSequentialPriorPhase();
             SUMOTime timeTillForceOff = controller->ModeCycle(priorPhase->forceOffTime - controller->getTimeInCycle(), controller->getCurrentCycleLength());
