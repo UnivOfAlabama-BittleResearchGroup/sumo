@@ -182,7 +182,7 @@ public:
     inline SUMOTime getTimeInCycle() const { return (simTime - cycleRefPoint - offset) % myCycleLength;};
 
     // General Force Offs Function
-    const SUMOTime coordModeCycle(PhasePtr phase)  {
+    SUMOTime coordModeCycle(PhasePtr phase)  {
         switch (myCabinetType){
             case Type170:
                 return coordModeCycle170(phase);
@@ -257,7 +257,7 @@ protected:
     void createDetectorObjects();
 
     /// @brief helper function for finding if vector contains a phase
-    const bool vectorContainsPhase(std::vector<int> v, int phaseNum);
+    bool vectorContainsPhase(std::vector<int> v, int phaseNum);
 
     // create a small datatype for mapping detector to phase index
     // This is the one copied from MSActuatedTrafficLightLogic
@@ -474,11 +474,11 @@ class NEMAPhase {
                 detectActive(),
                 latching()
             {}
-            phaseDetectorInfo(bool latching, PhasePtr cpdTarget, PhasePtr cpdSource):
-                latching(latching),
-                cpdSource(cpdSource),
+            phaseDetectorInfo(bool latching, PhasePtr cpdSource, PhasePtr cpdTarget):
                 cpdTarget(cpdTarget),
-                detectActive(false)
+                cpdSource(cpdSource),
+                detectActive(false),
+                latching(latching)
             {}
             std::vector<MSE2Collector*> detectors;
             PhasePtr cpdTarget;
@@ -513,12 +513,6 @@ class NEMAPhase {
         /// @brief Destructor
         ~NEMAPhase();
 
-        // /// @brief to make the deconstructor polymorphic
-        // virtual ~NEMAPhase(){};
-        
-        /// @brief return reference to instance
-        PhasePtr getInstance();
-
         // return the current state
         inline LightState getCurrentState() const { return myLightState; }
         inline std::vector<MSE2Collector*> getDetectors() const { return myDetectorInfo.detectors; } 
@@ -540,13 +534,13 @@ class NEMAPhase {
         void exit(NEMALogic* controller, PhaseTransitionLogic* nextPhases[2]);
         
         /// @brief simple method to check if there is a recall on the phase.
-        inline const bool hasRecall(void) { return minRecall || maxRecall; }; 
+        inline bool hasRecall(void) { return minRecall || maxRecall; }; 
         
         /// @brief simple method to check if there is either a recall or an active detector
-        inline const bool callActive(void) { return minRecall || maxRecall || myDetectorInfo.detectActive; };
+        inline bool callActive(void) { return minRecall || maxRecall || myDetectorInfo.detectActive; };
 
         /// @brief simple method to check if a detector is active
-        inline const bool detectActive(void) { return myDetectorInfo.detectActive; };
+        inline bool detectActive(void) { return myDetectorInfo.detectActive; };
 
 
         // Check Detectors. Called on all phases at every step
@@ -559,11 +553,11 @@ class NEMAPhase {
         bool isAtBarrier;
         bool isGreenRest;
         int barrierNum;
-        int ringNum;
-        bool coordinatePhase; 
-        bool fixForceOff;
+        bool coordinatePhase;
         bool minRecall;
         bool maxRecall;
+        bool fixForceOff;
+        int ringNum;
 
         /// Need to Know Phase Settings
         SUMOTime greenRestTimer;
@@ -661,7 +655,7 @@ class PhaseTransitionLogic {
         // Check to see if transition is okay
         bool okay(NEMALogic* controller);
 
-        const int getDistance(PhaseTransitionLogic* otherTrans);
+        int getDistance(PhaseTransitionLogic* otherTrans);
         inline void setDistance(int d) { distance = d; };
         int distance;
 

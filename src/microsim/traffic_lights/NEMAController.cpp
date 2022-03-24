@@ -344,7 +344,7 @@ NEMALogic::constructTimingAndPhaseDefs(std::string &barriers, std::string &coord
     validate_timing();
 }
 
-const bool
+bool
 NEMALogic::vectorContainsPhase(std::vector<int> v, int phaseNum){
     if(std::find(v.begin(), v.end(), phaseNum) != v.end()) {
         return true;
@@ -1059,10 +1059,10 @@ NEMAPhase::NEMAPhase(int phaseName, bool isBarrier, bool isGreenRest, bool isCoo
                 isGreenRest(isGreenRest),
                 barrierNum(barrierNum),
                 coordinatePhase(isCoordinated),
-                fixForceOff(fixForceOff),
-                ringNum(ringNum),
                 minRecall(minRecall),
                 maxRecall(maxRecall),
+                fixForceOff(fixForceOff),
+                ringNum(ringNum),
                 myCorePhase(phase)
                 {
     // Public
@@ -1082,15 +1082,6 @@ NEMAPhase::NEMAPhase(int phaseName, bool isBarrier, bool isGreenRest, bool isCoo
     myStartTime = TIME2STEPS(0.);
     myExpectedDuration = myCorePhase->minDuration;
     myLastEnd = TIME2STEPS(0.);
-}
-
-// TODO: Do I need this?
-NEMAPhase*
-NEMAPhase::getInstance(void) {
-    if (this != nullptr) {
-        return this;
-    }
-    throw ProcessError("The phase has not been constructed yet");
 }
 
 NEMAPhase::~NEMAPhase(){
@@ -1113,7 +1104,7 @@ NEMAPhase::init(NEMALogic* controller, int crossPhaseTarget, int crossPhaseSourc
     }
 
     // sort the transitions by distance for speed later. Using plain distance here
-    std::sort(myTransitions.begin(), myTransitions.end(), [&](const auto *i, const auto *j) { return i->distance < j->distance; });
+    std::sort(myTransitions.begin(), myTransitions.end(), [&](const PhaseTransitionLogic *i, const PhaseTransitionLogic *j) { return i->distance < j->distance; });
 
     // create the phase detector info
     myDetectorInfo = phaseDetectorInfo(latching, 
@@ -1554,7 +1545,7 @@ PhaseTransitionLogic::fromCoord(NEMALogic* controller){
     return false;
 }
 
-const int
+int
 PhaseTransitionLogic::getDistance(PhaseTransitionLogic* otherTrans){
     // Returns a 0 during certain green 2 green situations
     if ((toPhase == fromPhase) && (otherTrans->toPhase->barrierNum == toPhase->barrierNum)){
@@ -1676,7 +1667,7 @@ NEMALogic::trySwitch(){
         // Sort the next phases and select the closest.
         if (transitions.size() > 0){
             std::sort(transitions.begin(), transitions.end(), 
-            [](const auto &i, const auto &j) { return i.distance < j.distance; });
+            [](const transitionInfo &i, const transitionInfo &j) { return i.distance < j.distance; });
         }
         // Set the Next Phases = to the shortest distance
         nextPhases[0] = transitions.front().p1;
