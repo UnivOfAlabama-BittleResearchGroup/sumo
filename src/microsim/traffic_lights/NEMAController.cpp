@@ -993,7 +993,7 @@ NEMALogic::getPhasesByRing(int ringNum){
 void 
 NEMALogic::setActivePhase(PhasePtr phase){ 
     myActivePhaseObjs[phase->ringNum] = phase; 
-};
+}
 
 std::map<std::string, double>
 NEMALogic::getDetectorStates() const {
@@ -1068,9 +1068,9 @@ NEMAPhase::init(NEMALogic* controller, int crossPhaseTarget, int crossPhaseSourc
     std::sort(myTransitions.begin(), myTransitions.end(), [&](const PhaseTransitionLogic *i, const PhaseTransitionLogic *j) { return i->distance < j->distance; });
 
     // create the phase detector info
-    myDetectorInfo = phaseDetectorInfo(latching, 
-        crossPhaseTarget > 0 ? controller->getPhaseObj(crossPhaseTarget) : nullptr, 
-        crossPhaseSource > 0 ? controller->getPhaseObj(crossPhaseSource) : nullptr
+    myDetectorInfo = phaseDetectorInfo(latching,
+        crossPhaseSource > 0 ? controller->getPhaseObj(crossPhaseSource) : nullptr,
+        crossPhaseTarget > 0 ? controller->getPhaseObj(crossPhaseTarget) : nullptr
     );
 }
 
@@ -1388,7 +1388,7 @@ PhaseTransitionLogic::PhaseTransitionLogic (
         toPhase(toPhase)
 {} 
 
-PhaseTransitionLogic::~PhaseTransitionLogic(){};
+PhaseTransitionLogic::~PhaseTransitionLogic(){}
 
 bool
 PhaseTransitionLogic::okay(NEMALogic* controller){
