@@ -33,14 +33,14 @@
 
 /**
  * @class GNEEdgeData
- * @brief An Element which don't belongs to GNENet but has influency in the simulation
+ * @brief An Element which don't belong to GNENet but has influence in the simulation
  */
 class GNEEdgeData : public GNEGenericData {
 
 public:
     /**@brief Constructor
      * @param[in] dataIntervalParent pointer to data interval parent
-     * @param[in] edgeParent poinetr to Edge parent
+     * @param[in] edgeParent pointer to Edge parent
      * @param[in] parameters parameters map
      */
     GNEEdgeData(GNEDataInterval* dataIntervalParent, GNEEdge* edgeParent, const Parameterised::Map& parameters);
@@ -62,12 +62,12 @@ public:
 
     /// @name members and functions relative to write data sets into XML
     /// @{
-    /**@brief writte data set element into a xml file
+    /**@brief write data set element into a xml file
      * @param[in] device device in which write parameters of data set element
      */
     void writeGenericData(OutputDevice& device) const;
 
-    /// @brief check if current data set is valid to be writed into XML (by default true, can be reimplemented in children)
+    /// @brief check if current data set is valid to be written into XML (by default true, can be reimplemented in children)
     bool isGenericDataValid() const;
 
     /// @brief return a string with the current data set problem (by default empty, can be reimplemented in children)
@@ -86,7 +86,7 @@ public:
      */
     void drawGL(const GUIVisualizationSettings& s) const;
 
-    /// @brief return exaggeration asociated with this GLObject
+    /// @brief return exaggeration associated with this GLObject
     double getExaggeration(const GUIVisualizationSettings& s) const;
 
     //// @brief Returns the boundary to which the view shall be centered in order to show the object
@@ -147,7 +147,7 @@ public:
 
     /**@brief method for checking if the key and their conrrespond attribute are valids
      * @param[in] key The attribute key
-     * @param[in] value The value asociated to key key
+     * @param[in] value The value associated to key key
      * @return true if the value is valid, false in other case
      */
     bool isValid(SumoXMLAttr key, const std::string& value);

@@ -946,7 +946,7 @@ def modifyAttribute(attributeNumber, value, overlapped):
     focusOnFrame()
     # jump to attribute depending if it's a overlapped element
     if overlapped:
-        for _ in range(attributeNumber + 1 + attrs.EditElements.overlapped):
+        for _ in range(attributeNumber + 1 + attrs.editElements.overlapped):
             typeTab()
     else:
         for _ in range(attributeNumber + 1):
@@ -965,12 +965,65 @@ def modifyBoolAttribute(attributeNumber, overlapped):
     focusOnFrame()
     # jump to attribute depending if it's a overlapped element
     if overlapped:
-        for _ in range(attributeNumber + 1 + attrs.EditElements.overlapped):
+        for _ in range(attributeNumber + 1 + attrs.editElements.overlapped):
             typeTab()
     else:
         for _ in range(attributeNumber + 1):
             typeTab()
     # type SPACE to change value
+    typeSpace()
+
+
+def modifyColorAttribute(attributeNumber, color, overlapped):
+    """
+    @brief modify color using dialog
+    """
+    # focus current frame
+    focusOnFrame()
+    # jump to attribute depending if it's a overlapped element
+    if overlapped:
+        for _ in range(attributeNumber + 1 + attrs.editElements.overlapped):
+            typeTab()
+    else:
+        for _ in range(attributeNumber + 1):
+            typeTab()
+    typeSpace()
+    # go to list of colors TextField
+    for _ in range(2):
+        typeInvertTab()
+    # select color
+    for _ in range(1 + color):
+        typeKey('down')
+    # go to accept button and press it
+    typeTab()
+    typeSpace()
+
+
+def modifyAllowDisallowValue(numTabs, overlapped):
+    """
+    @brief modify allow/disallow values
+    """
+    # open dialog
+    modifyBoolAttribute(numTabs, overlapped)
+    # select vtypes
+    for _ in range(2):
+        typeTab()
+    # Change current value
+    typeSpace()
+    # select vtypes
+    for _ in range(6):
+        typeTab()
+    # Change current value
+    typeSpace()
+    # select vtypes
+    for _ in range(12):
+        typeTab()
+    # Change current value
+    typeSpace()
+    # select vtypes
+    for _ in range(11):
+        typeTab()
+    # Change current value
     typeSpace()
 
 
@@ -1242,13 +1295,39 @@ def changeDefaultValue(numTabs, length):
 
 
 def changeDefaultBoolValue(numTabs):
-    """
-    @brief modify default boolean value of an additional, shape, vehicle...
-    """
+
     # focus current frame
     focusOnFrame()
     # place cursor in check Box position
     for _ in range(numTabs):
+        typeTab()
+    # Change current value
+    typeSpace()
+
+
+def changeDefaultAllowDisallowValue(numTabs):
+    """
+    @brief modify allow/disallow values
+    """
+    # open dialog
+    changeDefaultBoolValue(numTabs)
+    # select vtypes
+    for _ in range(2):
+        typeTab()
+    # Change current value
+    typeSpace()
+    # select vtypes
+    for _ in range(6):
+        typeTab()
+    # Change current value
+    typeSpace()
+    # select vtypes
+    for _ in range(12):
+        typeTab()
+    # Change current value
+    typeSpace()
+    # select vtypes
+    for _ in range(11):
         typeTab()
     # Change current value
     typeSpace()

@@ -43,6 +43,9 @@ netedit.inspectMode()
 # inspect first TAZ
 netedit.leftClick(referencePosition, 115, 70)
 
+# change color using dialog
+netedit.modifyColorAttribute(netedit.attrs.TAZ.inspectSelection.colorButton, 5, False)
+
 # Change parameter 2 with a non valid value (dummy)
 netedit.modifyAttribute(netedit.attrs.TAZ.inspectSelection.color, "dummyColor", False)
 
@@ -56,8 +59,8 @@ netedit.modifyAttribute(netedit.attrs.TAZ.inspectSelection.color, "blue", False)
 netedit.modifyAttribute(netedit.attrs.TAZ.inspectSelection.color, "125,60,200", False)
 
 # Check undos and redos
-netedit.undo(referencePosition, 3)
-netedit.redo(referencePosition, 3)
+netedit.undo(referencePosition, 4)
+netedit.redo(referencePosition, 4)
 
 # save TAZs
 netedit.saveAdditionals(referencePosition)

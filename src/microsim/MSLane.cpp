@@ -1956,7 +1956,9 @@ MSLane::executeMovements(const SUMOTime t) {
         if (MSGlobals::gTimeToGridlock > 0 || MSGlobals::gTimeToGridlockHighways > 0 || MSGlobals::gTimeToTeleportDisconnected >= 0) {
             const bool wrongLane = !appropriate(firstNotStopped);
             const bool r1 = MSGlobals::gTimeToGridlock > 0 && firstNotStopped->getWaitingTime() > MSGlobals::gTimeToGridlock;
-            const bool r2 = !r1 && MSGlobals::gTimeToGridlockHighways > 0 && firstNotStopped->getWaitingTime() > MSGlobals::gTimeToGridlockHighways && getSpeedLimit() > 69. / 3.6 && wrongLane;
+            const bool r2 = !r1 && MSGlobals::gTimeToGridlockHighways > 0
+                && firstNotStopped->getWaitingTime() > MSGlobals::gTimeToGridlockHighways
+                && getSpeedLimit() > MSGlobals::gGridlockHighwaysSpeed && wrongLane;
             const bool r3 = !r1 && !r2 && MSGlobals::gTimeToTeleportDisconnected >= 0 && firstNotStopped->getWaitingTime() > MSGlobals::gTimeToTeleportDisconnected
                             && firstNotStopped->succEdge(1) != nullptr
                             && firstNotStopped->getEdge()->allowedLanes(*firstNotStopped->succEdge(1), firstNotStopped->getVClass()) == nullptr;
@@ -2660,7 +2662,8 @@ MSLane::getCriticalLeader(double dist, double seen, double speed, const MSVehicl
                 // XXX ignoring pedestrians here!
                 // XXX ignoring the fact that the link leader may alread by following us
                 // XXX ignoring the fact that we may drive up to the crossing point
-                const double tmpSpeed = veh.getSafeFollowSpeed((*it).vehAndGap, seen, nextLane, (*it).distToCrossing);
+                double tmpSpeed = safeSpeed;
+                veh.adaptToJunctionLeader((*it).vehAndGap, seen, nullptr, nextLane, tmpSpeed, tmpSpeed, (*it).distToCrossing);
 #ifdef DEBUG_CONTEXT
                 if (DEBUG_COND2(&veh)) {
                     std::cout << "    linkLeader=" << leader->getID() << " gap=" << result.second << " tmpSpeed=" << tmpSpeed << " safeSpeed=" << safeSpeed << "\n";

@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-<!-- generated on 2022-03-15 07:54:37 by Eclipse SUMO sumo Version v1_12_0+1381-802d85a9a91
+<!-- generated on 2022-04-01 22:10:24 by Eclipse SUMO sumo Version v1_12_0+1874-91efc38
 -->
 
 <configuration xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://sumo.dlr.de/xsd/sumoConfiguration.xsd">
@@ -360,6 +360,9 @@
         <!-- The waiting time after which vehicles on a fast road (speed &gt; 69km/h) are teleported if they are on a non-continuing lane -->
         <time-to-teleport.highways value="0" type="TIME"/>
 
+        <!-- The waiting time after which vehicles on a fast road (default: speed &gt; 69km/h) are teleported if they are on a non-continuing lane -->
+        <time-to-teleport.highways.min-speed value="19.1667" type="FLOAT"/>
+
         <!-- The waiting time after which vehicles with a disconnected route are teleported. Negative values disable teleporting -->
         <time-to-teleport.disconnected value="-1" type="TIME"/>
 
@@ -485,6 +488,9 @@
 
         <!-- Apply the given time penalty when computing minimum routing costs for minor-link internal lanes -->
         <weights.minor-penalty value="1.5" type="FLOAT"/>
+
+        <!-- Apply scaled travel time penalties based on green split when computing minimum routing costs for internal lanes at traffic lights -->
+        <weights.tls-penalty value="0" type="FLOAT"/>
 
         <!-- Consider edge priorities in addition to travel times, weighted by factor -->
         <weights.priority-factor value="0" type="FLOAT"/>

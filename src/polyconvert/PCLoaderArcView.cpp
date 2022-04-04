@@ -122,6 +122,9 @@ PCLoaderArcView::load(const std::string& file, OptionsCont& oc, PCPolyContainer&
     poLayer->ResetReading();
     int runningID = 0;
     while ((poFeature = poLayer->GetNextFeature()) != nullptr) {
+        if (runningID == 0) {
+            WRITE_MESSAGE("Available fields: " + toString(getFieldNames(poFeature)));
+        }
         std::vector<Parameterised*> parCont;
         // read in edge attributes
         std::string id = useRunningID ? toString(runningID) : poFeature->GetFieldAsString(idField.c_str());
@@ -142,16 +145,18 @@ PCLoaderArcView::load(const std::string& file, OptionsCont& oc, PCPolyContainer&
         double layer = oc.getFloat("layer");
         double angle = Shape::DEFAULT_ANGLE;
         std::string imgFile = Shape::DEFAULT_IMG_FILE;
-        if (type != "" && tm.has(type)) {
-            const PCTypeMap::TypeDef& def = tm.get(type);
-            if (def.discard) {
-                continue;
+        if (type != "") {
+            if (tm.has(type)) {
+                const PCTypeMap::TypeDef& def = tm.get(type);
+                if (def.discard) {
+                    continue;
+                }
+                color = def.color;
+                layer = def.layer;
+                angle = def.angle;
+                imgFile = def.imgFile;
+                type = def.id;
             }
-            color = def.color;
-            layer = def.layer;
-            angle = def.angle;
-            imgFile = def.imgFile;
-            type = def.id;
         } else {
             type = oc.getString("type");
         }
@@ -309,6 +314,18 @@ PCLoaderArcView::load(const std::string& file, OptionsCont& oc, PCPolyContainer&
     WRITE_ERROR("SUMO was compiled without GDAL support.");
 #endif
 }
+
+std::vector<std::string>
+PCLoaderArcView::getFieldNames(OGRFeature* poFeature) {
+    std::vector<std::string> fields;
+#ifdef HAVE_GDAL
+    for (int i = 0; i < poFeature->GetFieldCount(); i++) {
+        fields.push_back(poFeature->GetFieldDefnRef(i)->GetNameRef());
+    }
+#endif
+    return fields;
+}
+
 
 
 /****************************************************************************/

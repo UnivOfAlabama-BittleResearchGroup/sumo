@@ -46,7 +46,8 @@
 // ---------------------------------------------------------------------------
 
 GNENetHelper::AttributeCarriers::AttributeCarriers(GNENet* net) :
-    myNet(net) {
+    myNet(net),
+    myStopIndex(0) {
     // fill additionals with tags
     auto additionalTags = GNEAttributeCarrier::getTagPropertiesByType(GNETagProperties::TagType::ADDITIONALELEMENT | 
         GNETagProperties::TagType::SHAPE | GNETagProperties::TagType::SYMBOL | GNETagProperties::TagType::TAZELEMENT | GNETagProperties::TagType::WIRE);
@@ -191,10 +192,10 @@ GNENetHelper::AttributeCarriers::retrieveAttributeCarrier(const GUIGlID id, bool
     GUIGlObject* object = GUIGlObjectStorage::gIDStorage.getObjectBlocking(id);
     // Make sure that object exists
     if (object != nullptr) {
-        // unblock and try to parse to AtributeCarrier
+        // unblock and try to parse to AttributeCarrier
         GUIGlObjectStorage::gIDStorage.unblockObject(id);
         GNEAttributeCarrier* ac = dynamic_cast<GNEAttributeCarrier*>(object);
-        // If was sucesfully parsed, return it
+        // If was successfully parsed, return it
         if (ac == nullptr) {
             throw ProcessError("GUIGlObject does not match the declared type");
         } else {
@@ -1292,6 +1293,11 @@ GNENetHelper::AttributeCarriers::addDefaultVTypes() {
     GNEVType* defaultContainerType = new GNEVType(myNet, DEFAULT_CONTAINERTYPE_ID, SVC_IGNORING);
     myDemandElements.at(defaultContainerType->getTagProperty().getTag()).insert(defaultContainerType);
     defaultContainerType->incRef("GNENet::DEFAULT_CONTAINERTYPE_ID");
+}
+
+
+int GNENetHelper::AttributeCarriers::getStopIndex() {
+    return myStopIndex++;
 }
 
 

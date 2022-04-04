@@ -857,9 +857,9 @@ MSBaseVehicle::getDevice(const std::type_info& type) const {
 
 void
 MSBaseVehicle::saveState(OutputDevice& out) {
-    // this saves lots of departParameters which are only needed for vehicles that did not yet depart
     // the parameters may hold the name of a vTypeDistribution but we are interested in the actual type
-    myParameter->write(out, OptionsCont::getOptions(), SUMO_TAG_VEHICLE, getVehicleType().getID());
+    const std::string& typeID = MSNet::getInstance()->getVehicleControl().hasVTypeDistribution(myParameter->vtypeid) || getVehicleType().isVehicleSpecific() ? getVehicleType().getID() : "";
+    myParameter->write(out, OptionsCont::getOptions(), SUMO_TAG_VEHICLE, typeID);
     // params and stops must be written in child classes since they may wish to add additional attributes first
     out.writeAttr(SUMO_ATTR_ROUTE, myRoute->getID());
     std::ostringstream os;
@@ -907,6 +907,12 @@ MSBaseVehicle::isParking() const {
 bool
 MSBaseVehicle::isStoppedTriggered() const {
     return isStopped() && (myStops.begin()->triggered || myStops.begin()->containerTriggered || myStops.begin()->joinTriggered);
+}
+
+
+bool
+MSBaseVehicle::isStoppedParking() const {
+    return isStopped() && myStops.begin()->pars.parking;
 }
 
 
@@ -1149,6 +1155,27 @@ MSBaseVehicle::addStop(const SUMOVehicleParameter::Stop& stopPar, std::string& e
                        + "' set to end at " + time2string(stop.pars.until)
                        + " earlier than previous stop at " + time2string(iter2->pars.until) + ".";
         }
+        if (stop.pars.arrival >= 0 && iter2->pars.until > stop.pars.arrival) {
+            errorMsg = errorMsgStart + " for vehicle '" + myParameter->id + "' on lane '" + stop.lane->getID()
+                       + "' set to start at " + time2string(stop.pars.arrival)
+                       + " earlier than previous stop end at " + time2string(iter2->pars.until) + ".";
+        }
+        if (stop.pars.arrival >= 0 && iter2->pars.arrival > stop.pars.arrival) {
+            errorMsg = errorMsgStart + " for vehicle '" + myParameter->id + "' on lane '" + stop.lane->getID()
+                       + "' set to start at " + time2string(stop.pars.arrival)
+                       + " earlier than previous stop arrival at " + time2string(iter2->pars.arrival) + ".";
+        }
+    } else {
+        if (stop.pars.until >= 0 && getParameter().depart > stop.pars.until) {
+            errorMsg = errorMsgStart + " for vehicle '" + myParameter->id + "' on lane '" + stop.lane->getID()
+                       + "' set to end at " + time2string(stop.pars.until)
+                       + " earlier than departure at " + time2string(getParameter().depart) + ".";
+        }
+    }
+    if (stop.pars.until >= 0 && stop.pars.arrival > stop.pars.until && errorMsg == "") {
+        errorMsg = errorMsgStart + " for vehicle '" + myParameter->id + "' on lane '" + stop.lane->getID()
+            + "' set to end at " + time2string(stop.pars.until)
+            + " earlier than arrival at " + time2string(stop.pars.arrival) + ".";
     }
     myStops.insert(iter, stop);
     //std::cout << " added stop " << errorMsgStart << " totalStops=" << myStops.size() << " searchStart=" << (*searchStart - myRoute->begin())

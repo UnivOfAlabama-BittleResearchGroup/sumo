@@ -43,7 +43,7 @@ class GNEGenericData;
 
 /**
  * @class GNEDataInterval
- * @brief An Element which don't belongs to GNENet but has influency in the simulation
+ * @brief An Element which don't belong to GNENet but has influence in the simulation
  */
 class GNEDataInterval : public GNEHierarchicalElement, public Parameterised {
 
@@ -84,7 +84,7 @@ public:
 
     /// @name members and functions relative to write data elements into XML
     /// @{
-    /// @brief check if current data element is valid to be writed into XML (by default true, can be reimplemented in children)
+    /// @brief check if current data element is valid to be written into XML (by default true, can be reimplemented in children)
     bool isDataIntervalValid() const;
 
     /// @brief return a string with the current data element problem (by default empty, can be reimplemented in children)
@@ -143,7 +143,7 @@ public:
 
     /**@brief method for checking if the key and their conrrespond attribute are valids
      * @param[in] key The attribute key
-     * @param[in] value The value asociated to key key
+     * @param[in] value The value associated to key key
      * @return true if the value is valid, false in other case
      */
     bool isValid(SumoXMLAttr key, const std::string& value);

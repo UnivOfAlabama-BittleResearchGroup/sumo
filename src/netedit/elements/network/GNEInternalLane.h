@@ -92,7 +92,7 @@ public:
      */
     GUIParameterTableWindow* getParameterWindow(GUIMainWindow& app, GUISUMOAbstractView& parent);
 
-    /// @brief return exaggeration asociated with this GLObject
+    /// @brief return exaggeration associated with this GLObject
     double getExaggeration(const GUIVisualizationSettings& s) const;
 
     /// @brief update centering boundary (implies change in RTREE)
@@ -108,7 +108,7 @@ public:
     /// @brief set the linkState (controls drawing color)
     void setLinkState(LinkState state);
 
-    /// @brief whether link state has been modfied
+    /// @brief whether link state has been modified
     LinkState getLinkState() const;
 
     /// @brief multiplexes message to two targets
@@ -140,7 +140,7 @@ public:
 
     /* @brief method for checking if the key and their conrrespond attribute are valids
      * @param[in] key The attribute key
-     * @param[in] value The value asociated to key key
+     * @param[in] value The value associated to key key
      * @return true if the value is valid, false in other case
      */
     bool isValid(SumoXMLAttr key, const std::string& value);

@@ -19,11 +19,12 @@
 # GENERAL
 # --------------------------------
 
-class EditElements:
+
+class editElements:
     overlapped = 5
 
-class Selection:
-    class LockSelectionNetwork:
+class selection:
+    class lockSelectionNetwork:
         junctions = 1
         edges = 2
         lanes = 3
@@ -35,8 +36,8 @@ class Selection:
         POIs = 9
 
 
-class Modes:
-    class Network:
+class modes:
+    class network:
         grid = '1'
         junctionShape = '2'
         spreadVehicle = '3'
@@ -48,13 +49,19 @@ class Modes:
         chainMode = '5'
         twoWayMode = '6'
 
-    class Demand:
+    class demand:
         grid = '1'
         junctionShape = '2'
 
-    class Data:
+    class data:
         junctionShape = '1'
 
+
+class frames:
+    class route:
+        create = 15
+        abort = 16
+        removeLastInsertedEdge = 17
 
 # --------------------------------
 # NETWORK
@@ -246,7 +253,7 @@ class connection:
         changeLeftButton = 13
         changeLeft = 14
         changeRightButton = 15
-        changeRignt = 16
+        changeRight = 16
         indirect = 17
         type = 18
         parameters = 21
@@ -268,8 +275,8 @@ class connection:
         customShape = 14
         changeLeftButton = 15
         changeLeft = 16
-        changeRightBtton = 17
-        changeRignt = 18
+        changeRightButton = 17
+        changeRight = 18
         indirect = 19
         type = 20
         parameters = 23
@@ -286,13 +293,12 @@ class connection:
         disallow = 9
         speed = 10
         length = 11
-        customShape = 12
-        changeLeftButton = 13
-        changeLeft = 14
-        changeRightButton = 15
-        changeRignt = 16
-        indirect = 17
-        type = 18
+        changeLeftButton = 12
+        changeLeft = 13
+        changeRightButton = 14
+        changeRight = 15
+        indirect = 16
+        type = 17
         parameters = 20
 
     class inspectSelectionTLS:
@@ -309,13 +315,12 @@ class connection:
         disallow = 11
         speed = 12
         length = 13
-        customShape = 14
-        changeLeftButton = 15
-        changeLeft = 16
-        changeRightBtton = 17
-        changeRignt = 18
-        indirect = 19
-        type = 20
+        changeLeftButton = 14
+        changeLeft = 15
+        changeRightButton = 16
+        changeRight = 17
+        indirect = 18
+        type = 19
         parameters = 22
 
     saveConnections = 4

@@ -35,7 +35,7 @@ netedit.rebuildNetwork()
 netedit.forceSaveAdditionals()
 
 # toggle select lanes
-netedit.changeEditMode(netedit.attrs.Modes.Network.selectLane)
+netedit.changeEditMode(netedit.attrs.modes.network.selectLane)
 
 # go to select mode
 netedit.selectMode()
@@ -63,6 +63,9 @@ netedit.modifyAttribute(netedit.attrs.lane.inspectSelection.allow, "authority  a
 
 # Change parameter 1 with a valid value (empty)
 netedit.modifyAttribute(netedit.attrs.lane.inspectSelection.allow, "", True)
+
+# Change parameter 8 with a valid value (empty)
+netedit.modifyAllowDisallowValue(netedit.attrs.lane.inspectSelection.allowButton, True)
 
 # Change parameter 1 with a valid value (empty)
 netedit.modifyAttribute(netedit.attrs.lane.inspectSelection.allow,

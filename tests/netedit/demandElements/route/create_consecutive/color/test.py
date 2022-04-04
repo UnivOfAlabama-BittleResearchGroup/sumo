@@ -34,12 +34,24 @@ netedit.supermodeDemand()
 # go to route mode
 netedit.routeMode()
 
+# set color using dialog
+netedit.changeColorUsingDialog(netedit.attrs.route.create.colorButton, 5)
+
+# create edge
+netedit.leftClick(referencePosition, 274, 392)
+netedit.leftClick(referencePosition, 570, 250)
+netedit.leftClick(referencePosition, 280, 55)
+
+# press enter to create route
+netedit.typeEnter()
+
 # set invalid color
 netedit.changeDefaultValue(netedit.attrs.route.create.color, "dummyColor")
 
 # try to create route using three edges
 netedit.leftClick(referencePosition, 274, 392)
 netedit.leftClick(referencePosition, 570, 250)
+netedit.leftClick(referencePosition, 280, 55)
 
 # press enter to try to create route
 netedit.typeEnter()
@@ -54,14 +66,16 @@ netedit.typeEnter()
 netedit.changeDefaultValue(netedit.attrs.route.create.color, "blue")
 
 # try to create route using three edges
+netedit.leftClick(referencePosition, 274, 392)
+netedit.leftClick(referencePosition, 570, 250)
 netedit.leftClick(referencePosition, 280, 55)
 
 # press enter to create route
 netedit.typeEnter()
 
 # Check undo redo
-netedit.undo(referencePosition, 2)
-netedit.redo(referencePosition, 2)
+netedit.undo(referencePosition, 3)
+netedit.redo(referencePosition, 3)
 
 # save routes
 netedit.saveRoutes(referencePosition)

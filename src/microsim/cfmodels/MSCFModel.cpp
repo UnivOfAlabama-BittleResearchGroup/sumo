@@ -886,7 +886,12 @@ MSCFModel::maximumSafeFollowSpeed(double gap, double egoSpeed, double predSpeed,
     //    const double headway = predSpeed > 0. ? myHeadwayTime : 0.;
 
     const double headway = myHeadwayTime;
-    double x = maximumSafeStopSpeed(gap + brakeGap(predSpeed, MAX2(myDecel, predMaxDecel), 0), myDecel, egoSpeed, onInsertion, headway);
+    double x;
+    if (gap >= 0 || MSGlobals::gComputeLC) {
+        x = maximumSafeStopSpeed(gap + brakeGap(predSpeed, MAX2(myDecel, predMaxDecel), 0), myDecel, egoSpeed, onInsertion, headway);
+    } else {
+        x = egoSpeed - ACCEL2SPEED(myEmergencyDecel);
+    }
 
     if (myDecel != myEmergencyDecel && !onInsertion && !MSGlobals::gComputeLC) {
         double origSafeDecel = SPEED2ACCEL(egoSpeed - x);
@@ -896,16 +901,16 @@ MSCFModel::maximumSafeFollowSpeed(double gap, double egoSpeed, double predSpeed,
             // can result in corrupted values (leading to intersecting trajectories) if, e.g. leader and follower are fast (leader still faster) and the gap is very small,
             // such that braking harder than myDecel is required.
 
+            double safeDecel = EMERGENCY_DECEL_AMPLIFIER * calculateEmergencyDeceleration(gap, egoSpeed, predSpeed, predMaxDecel);
 #ifdef DEBUG_EMERGENCYDECEL
             if (DEBUG_COND2) {
                 std::cout << SIMTIME << " initial vsafe=" << x
                           << " egoSpeed=" << egoSpeed << " (origSafeDecel=" << origSafeDecel << ")"
                           << " predSpeed=" << predSpeed << " (predDecel=" << predMaxDecel << ")"
+                          << " safeDecel=" << safeDecel
                           << std::endl;
             }
 #endif
-
-            double safeDecel = EMERGENCY_DECEL_AMPLIFIER * calculateEmergencyDeceleration(gap, egoSpeed, predSpeed, predMaxDecel);
             // Don't be riskier than the usual method (myDecel <= safeDecel may occur, because a headway>0 is used above)
             safeDecel = MAX2(safeDecel, myDecel);
             // don't brake harder than originally planned (possible due to euler/ballistic mismatch)
@@ -934,6 +939,10 @@ MSCFModel::calculateEmergencyDeceleration(double gap, double egoSpeed, double pr
     // There are two cases:
     // 1) Either, stopping in time is possible with a deceleration b <= predMaxDecel, then this value is returned
     // 2) Or, b > predMaxDecel is required in this case the minimal value b allowing to stop safely under the assumption maxPredDecel=b is returned
+    assert(gap < 0 || predSpeed < egoSpeed);
+    if (gap <= 0.) {
+        return myEmergencyDecel;
+    }
 
     // Apparent braking distance for the leader
     const double predBrakeDist = 0.5 * predSpeed * predSpeed / predMaxDecel;
@@ -966,10 +975,6 @@ MSCFModel::calculateEmergencyDeceleration(double gap, double egoSpeed, double pr
 #endif
 
     // Case 2) applies
-    assert(gap < 0 || predSpeed < egoSpeed);
-    if (gap <= 0.) {
-        return -ACCEL2SPEED(myEmergencyDecel);
-    }
     // Required deceleration according to case 2)
     const double b2 = 0.5 * (egoSpeed * egoSpeed - predSpeed * predSpeed) / gap;
 

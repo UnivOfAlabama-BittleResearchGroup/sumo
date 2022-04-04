@@ -34,6 +34,7 @@ SUMOTime MSGlobals::gIgnoreJunctionBlocker;
 
 SUMOTime MSGlobals::gTimeToGridlock;
 SUMOTime MSGlobals::gTimeToGridlockHighways;
+double MSGlobals::gGridlockHighwaysSpeed;
 SUMOTime MSGlobals::gTimeToTeleportDisconnected;
 bool MSGlobals::gRemoveGridlocked;
 
@@ -78,6 +79,7 @@ int MSGlobals::gNumThreads;
 double MSGlobals::gEmergencyDecelWarningThreshold(1);
 
 double MSGlobals::gMinorPenalty(0);
+double MSGlobals::gTLSPenalty(0);
 
 bool MSGlobals::gModelParkingManoeuver;
 

@@ -1520,6 +1520,10 @@ public:
             return myLastRemoteAccess;
         }
 
+        /// @brief update route if provided by remote control
+        void updateRemoteControlRoute(MSVehicle* v);
+
+        /// @brief update position from remote control
         void postProcessRemoteControl(MSVehicle* v);
 
         /// @brief return the speed that is implicit in the new remote position
@@ -1640,10 +1644,6 @@ public:
 
     /// @brief sets position outside the road network
     void setRemoteState(Position xyPos);
-
-    /// @brief compute safe speed for following the given leader
-    double getSafeFollowSpeed(const std::pair<const MSVehicle*, double> leaderInfo,
-                              const double seen, const MSLane* const lane, double distToCrossing) const;
 
     /// @brief get a numerical value for the priority of the  upcoming link
     static int nextLinkPriority(const std::vector<MSLane*>& conts);
@@ -1863,12 +1863,6 @@ protected:
     /// @brief Whether the vehicle is trying to enter the network (eg after parking so engine is running)
     bool myAmIdling;
 
-    /// @brief Whether this vehicle is registered as waiting for a person (for deadlock-recognition)
-    bool myAmRegisteredAsWaitingForPerson;
-
-    /// @brief Whether this vehicle is registered as waiting for a container (for deadlock-recognition)
-    bool myAmRegisteredAsWaitingForContainer;
-
     bool myHaveToWaitOnNextLink;
 
     /// @brief the angle in radians (@todo consider moving this into myState)
@@ -1973,17 +1967,21 @@ protected:
      * - a leader vehicle
      * - a vehicle or pedestrian that crosses this vehicles path on an upcoming intersection
      * @param[in] leaderInfo The leading vehicle and the (virtual) distance to it
-     * @param[in] seen the distance to the end of the current lane
      * @param[in] lastLink the lastLink index
-     * @param[in] lane The current Lane the vehicle is on
      * @param[in,out] the safe velocity for driving
      * @param[in,out] the safe velocity for arriving at the next link
-     * @param[in] distToCrossing The distance to the crossing point with the current leader where relevant or -1
      */
     void adaptToLeader(const std::pair<const MSVehicle*, double> leaderInfo,
+                       double seen,
+                       DriveProcessItem* const lastLink,
+                       double& v, double& vLinkPass) const;
+
+public:
+    void adaptToJunctionLeader(const std::pair<const MSVehicle*, double> leaderInfo,
                        const double seen, DriveProcessItem* const lastLink,
                        const MSLane* const lane, double& v, double& vLinkPass,
                        double distToCrossing = -1) const;
+protected:
 
     /* @brief adapt safe velocity in accordance to multiple vehicles ahead:
      * @param[in] ahead The leader information according to the current lateral-resolution
@@ -2000,8 +1998,9 @@ protected:
                         const MSLane* const lane, double& v, double& vLinkPass) const;
 
     void adaptToLeaderDistance(const MSLeaderDistanceInfo& ahead, double latOffset,
-                               const double seen, DriveProcessItem* const lastLink,
-                               const MSLane* const lane, double& v, double& vLinkPass) const;
+                               double seen,
+                               DriveProcessItem* const lastLink,
+                               double& v, double& vLinkPass) const;
 
     /// @brief checks for link leaders on the given link
     void checkLinkLeader(const MSLink* link, const MSLane* lane, double seen,

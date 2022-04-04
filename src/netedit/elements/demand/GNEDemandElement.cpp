@@ -921,7 +921,9 @@ GNEDemandElement::SortedStops::SortedStops(GNEEdge* edge_) :
 
 void
 GNEDemandElement::SortedStops::addStop(const GNEDemandElement* stop) {
-    myStops.push_back(std::make_pair(stop->getAttributeDouble(SUMO_ATTR_ENDPOS), stop));
+    // create first pair
+    auto posIndexPair = std::make_pair(stop->getAttributeDouble(SUMO_ATTR_ENDPOS), stop->getAttributeDouble(SUMO_ATTR_INDEX));
+    myStops.push_back(std::make_pair(posIndexPair, stop));
     // sort stops
     std::sort(myStops.begin(), myStops.end());
 }
@@ -985,6 +987,9 @@ GNEDemandElement::setFlowParameters(SUMOVehicleParameter *vehicleParameters, con
             case SUMO_ATTR_PERIOD:
                 vehicleParameters->parametersSet |= VEHPARS_PERIOD_SET;
                 break;
+            case GNE_ATTR_POISSON:
+                vehicleParameters->parametersSet |= VEHPARS_POISSON_SET;
+                break;
             case SUMO_ATTR_PROB:
                 vehicleParameters->parametersSet |= VEHPARS_PROB_SET;
                 break;
@@ -1006,6 +1011,9 @@ GNEDemandElement::setFlowParameters(SUMOVehicleParameter *vehicleParameters, con
                 break;
             case SUMO_ATTR_PERIOD:
                 vehicleParameters->parametersSet &= ~VEHPARS_PERIOD_SET;
+                break;
+            case GNE_ATTR_POISSON:
+                vehicleParameters->parametersSet &= ~VEHPARS_POISSON_SET;
                 break;
             case SUMO_ATTR_PROB:
                 vehicleParameters->parametersSet &= ~VEHPARS_PROB_SET;
@@ -1031,12 +1039,19 @@ GNEDemandElement::adjustDefaultFlowAttributes(SUMOVehicleParameter *vehicleParam
         }
         // vehicles/person/container per hour
         if (((vehicleParameters->parametersSet & VEHPARS_PERIOD_SET) == 0) && 
+            ((vehicleParameters->parametersSet & VEHPARS_POISSON_SET) == 0) &&
             ((vehicleParameters->parametersSet & VEHPARS_VPH_SET) == 0)) {
             setAttribute(SUMO_ATTR_PERIOD, myTagProperty.getDefaultValue(SUMO_ATTR_PERIOD));
         }
         // probability
         if ((vehicleParameters->parametersSet & VEHPARS_PROB_SET) == 0) {
             setAttribute(SUMO_ATTR_PROB, myTagProperty.getDefaultValue(SUMO_ATTR_PROB));
+        }
+        // poisson
+        if (vehicleParameters->repetitionOffset < 0) {
+            toogleAttribute(SUMO_ATTR_PERIOD, false);
+            toogleAttribute(GNE_ATTR_POISSON, true);
+            setAttribute(GNE_ATTR_POISSON, time2string(vehicleParameters->repetitionOffset * -1));
         }
     }
 }

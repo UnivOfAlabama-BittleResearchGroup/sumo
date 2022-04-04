@@ -555,6 +555,11 @@ public:
      */
     bool isStoppedTriggered() const;
 
+    /** @brief Returns whether the vehicle is on a parking stop
+     * @return whether the vehicle is on a parking stop
+     */
+    bool isStoppedParking() const;
+
     /** @brief return whether the given position is within range of the current stop
      */
     bool isStoppedInRange(const double pos, const double tolerance) const;
@@ -977,6 +982,9 @@ protected:
     /// memory for parking search
     ParkingMemory* myParkingMemory = nullptr;
     int myNumberParkingReroutes = 0;
+
+    /// @brief Whether this vehicle is registered as waiting for a person or container (for deadlock-recognition)
+    bool myAmRegisteredAsWaiting = false;
 
     /* @brief magic value for undeparted vehicles
      * @note: in previous versions this was -1

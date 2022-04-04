@@ -392,6 +392,9 @@ MSFrame::fillOptions() {
     oc.doRegister("time-to-teleport.highways", new Option_String("0", "TIME"));
     oc.addDescription("time-to-teleport.highways", "Processing", "The waiting time after which vehicles on a fast road (speed > 69km/h) are teleported if they are on a non-continuing lane");
 
+    oc.doRegister("time-to-teleport.highways.min-speed", new Option_Float(69 / 3.6));
+    oc.addDescription("time-to-teleport.highways.min-speed", "Processing", "The waiting time after which vehicles on a fast road (default: speed > 69km/h) are teleported if they are on a non-continuing lane");
+
     oc.doRegister("time-to-teleport.disconnected", new Option_String("-1", "TIME"));
     oc.addDescription("time-to-teleport.disconnected", "Processing", "The waiting time after which vehicles with a disconnected route are teleported. Negative values disable teleporting");
 
@@ -513,6 +516,9 @@ MSFrame::fillOptions() {
 
     oc.doRegister("weights.minor-penalty", new Option_Float(1.5));
     oc.addDescription("weights.minor-penalty", "Routing", "Apply the given time penalty when computing minimum routing costs for minor-link internal lanes");
+
+    oc.doRegister("weights.tls-penalty", new Option_Float(0));
+    oc.addDescription("weights.tls-penalty", "Routing", "Apply scaled travel time penalties based on green split when computing minimum routing costs for internal lanes at traffic lights");
 
     oc.doRegister("weights.priority-factor", new Option_Float(0));
     oc.addDescription("weights.priority-factor", "Routing", "Consider edge priorities in addition to travel times, weighted by factor");
@@ -943,6 +949,7 @@ MSFrame::setMSGlobals(OptionsCont& oc) {
     MSGlobals::gTimeToGridlock = string2time(oc.getString("time-to-teleport")) < 0 ? 0 : string2time(oc.getString("time-to-teleport"));
     MSGlobals::gTimeToImpatience = string2time(oc.getString("time-to-impatience"));
     MSGlobals::gTimeToGridlockHighways = string2time(oc.getString("time-to-teleport.highways")) < 0 ? 0 : string2time(oc.getString("time-to-teleport.highways"));
+    MSGlobals::gGridlockHighwaysSpeed = oc.getFloat("time-to-teleport.highways.min-speed");
     MSGlobals::gTimeToTeleportDisconnected = string2time(oc.getString("time-to-teleport.disconnected"));
     MSGlobals::gRemoveGridlocked = oc.getBool("time-to-teleport.remove");
     MSGlobals::gCheck4Accidents = !oc.getBool("ignore-accidents");
@@ -992,6 +999,7 @@ MSFrame::setMSGlobals(OptionsCont& oc) {
 
     MSGlobals::gEmergencyDecelWarningThreshold = oc.getFloat("emergencydecel.warning-threshold");
     MSGlobals::gMinorPenalty = oc.getFloat("weights.minor-penalty");
+    MSGlobals::gTLSPenalty = oc.getFloat("weights.tls-penalty");
 
     MSGlobals::gModelParkingManoeuver = oc.getBool("parking.maneuver");
 

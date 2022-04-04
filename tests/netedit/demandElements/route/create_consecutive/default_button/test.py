@@ -36,11 +36,12 @@ netedit.routeMode()
 
 # create route using three edges
 netedit.leftClick(referencePosition, 274, 392)
+netedit.leftClick(referencePosition, 570, 250)
 netedit.leftClick(referencePosition, 280, 55)
 
 # press button to create route
 netedit.focusOnFrame()
-for _ in range(15):
+for _ in range(netedit.attrs.frames.route.create):
     netedit.typeTab()
 netedit.typeSpace()
 
