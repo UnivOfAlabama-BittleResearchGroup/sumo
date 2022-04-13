@@ -212,7 +212,8 @@ class lane:
         changeRight = 14
         type = 15
         stopOffset = 16
-        stopOffsetException = 17
+        stopOffsetExceptionButton = 17
+        stopOffsetException = 18
         parameters = 21
 
     class inspectSelection:
@@ -230,7 +231,8 @@ class lane:
         changeRight = 12
         type = 13
         stopOffset = 14
-        stopOffsetException = 15
+        stopOffsetExceptionButton = 15
+        stopOffsetException = 16
         parameters = 19
 
 # connection
@@ -1166,6 +1168,75 @@ class TAZ:
 # DEMAND ELEMENTS
 # --------------------------------
 
+# type
+
+class type:
+    class buttons:
+        create = 2
+        delete = 3
+        copy = 3
+        dialog = 24
+
+    class edit:
+        id = 8
+        vTypeDist = 9
+        vClass = 10
+        colorButton = 12
+        color = 13
+        length = 14
+        minGap = 15
+        maxSpeed = 16
+        accel = 17
+        decel = 18
+        sigma = 19
+        tau = 20
+
+    class editDefault:
+        vTypeDist = 7
+        vClass = 8
+        colorButton = 10
+        color = 11
+        length = 12
+        minGap = 13
+        maxSpeed = 14
+        accel = 15
+        decel = 16
+        sigma = 17
+        tau = 18
+
+    class editDialog:
+        vClass = 1
+        id = 3
+        colorButton = 4
+        color = 5
+        length = 6
+        minGap = 7
+        maxSpeed = 8
+        speedFactor = 9
+        emissionClass = 10
+        width = 12
+        height = 13
+        imgFileButton = 14
+        imgFile = 15
+        osgFileButton = 16
+        osgFile = 17
+        probability = 18
+        laneChangeModel = 19
+        guiShape = 21
+        personCapacity = 23
+        containerCapacity = 24
+        boardingDuration = 25
+        loadingDuration = 26
+        latAlignment = 27
+        minGapLat = 29
+        maxSpeedLat = 30
+        actionStepLength = 31
+        carriageLength = 32
+        locomotiveLength = 33
+        carriageGap = 34
+        parametersButton = 35
+        parameters = 36
+
 # route
 
 
@@ -2069,47 +2140,30 @@ class person:
         id = 8
         colorButton = 9
         color = 10
-        depart = 11
+        departPos = 11
+        depart = 12
 
     class inspect:
         id = 1
-        type = 2
-        fromEdge = 3
-        toEdge = 4
-        via = 5
-        colorButton = 6
-        color = 7
-        departLane = 8
-        departPos = 9
-        departSpeed = 10
-        arrivalLane = 11
-        arrivalPos = 12
-        arrivalSpeed = 13
-        line = 14
-        personNumber = 15
-        containerNumber = 16
-        departPosLat = 17
-        arrivalPosLat = 18
-        depart = 19
-        parameters = 22
 
     class inspectSelection:
         type = 1
-        colorButton = 2
-        color = 3
-        departLane = 4
-        departPos = 5
-        departSpeed = 6
-        arrivalLane = 7
-        arrivalPos = 8
-        arrivalSpeed = 9
-        line = 10
-        personNumber = 11
-        containerNumber = 12
-        departPosLat = 13
-        arrivalPosLat = 14
-        depart = 15
-        parameters = 18
+
+
+class personFlow:
+    class create:
+        id = 8
+        colorButton = 9
+        color = 10
+        departPos = 11
+        begin = 12
+
+    class inspect:
+        id = 1
+
+    class inspectSelection:
+        type = 1
+
 
 # --------------------------------
 # DATA ELEMENTS
@@ -2151,7 +2205,9 @@ class TAZRelData:
         parameters = 12
 
     class inspect:
+        fromTAZ = 1
+        toTAZ = 2
         parameters = 5
 
     class inspectSelection:
-        parameters = 5
+        parameters = 3

@@ -106,7 +106,7 @@ MEVehicle::getPosition(const double offset) const {
 
 double
 MEVehicle::getSpeed() const {
-    if (getWaitingTime() > 0) {
+    if (getWaitingTime() > 0 || isStopped()) {
         return 0;
     } else {
         return getAverageSpeed();
@@ -116,7 +116,7 @@ MEVehicle::getSpeed() const {
 
 double
 MEVehicle::getAverageSpeed() const {
-    return mySegment != nullptr ? mySegment->getLength() / STEPS2TIME(myEventTime - myLastEntryTime) : 0;
+    return mySegment != nullptr ? MIN2(mySegment->getLength() / STEPS2TIME(myEventTime - myLastEntryTime), getEdge()->getVehicleMaxSpeed(this)) : 0;
 }
 
 
@@ -487,6 +487,17 @@ MEVehicle::onRemovalFromNet(const MSMoveReminder::Notification reason) {
     MSGlobals::gMesoNet->removeLeaderCar(this);
     MSGlobals::gMesoNet->changeSegment(this, MSNet::getInstance()->getCurrentTimeStep(), nullptr, reason);
 }
+
+double
+MEVehicle::getRightSideOnEdge(const MSLane* /*lane*/) const {
+    if (mySegment == nullptr || mySegment->getIndex() >= getEdge()->getNumLanes()) {
+        return 0;
+    }
+    const MSLane* lane = getEdge()->getLanes()[mySegment->getIndex()];
+    return lane->getRightSideOnEdge() + lane->getWidth() * 0.5 - 0.5 * getVehicleType().getWidth();
+
+}
+
 
 void
 MEVehicle::saveState(OutputDevice& out) {

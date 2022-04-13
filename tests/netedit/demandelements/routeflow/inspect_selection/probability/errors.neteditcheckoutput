@@ -1,0 +1,4 @@
+Warning: Vehicle 'flowA.2' will not be able to arrive with the given speed!
+Warning: Choosing new speed factor 1.20 for vehicle 'flowA.2' to match departure speed 12.00 (max 11.55).
+Error: Vehicle 'flowB.3' will not be able to depart using the given velocity (slow lane ahead)!
+Error: Vehicle 'flowB.5' will not be able to depart using the given velocity (slow lane ahead)!

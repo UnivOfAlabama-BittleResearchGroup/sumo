@@ -978,6 +978,7 @@ MSVehicle::MSVehicle(SUMOVehicleParameter* pars, const MSRoute* route,
     myJunctionEntryTime(SUMOTime_MAX),
     myJunctionEntryTimeNeverYield(SUMOTime_MAX),
     myJunctionConflictEntryTime(SUMOTime_MAX),
+    myTimeSinceStartup(TIME2STEPS(3600 * 24)),
     myInfluencer(nullptr) {
     myCFVariables = type->getCarFollowModel().createVehicleVariables();
     myNextDriveItem = myLFLinkLanes.begin();
@@ -2155,6 +2156,30 @@ MSVehicle::planMoveInternal(const SUMOTime t, MSLeaderInfo ahead, DriveItemVecto
 #endif
             adaptToLeaderDistance(oppositeLeaders, 0, seen, lastLink, v, vLinkPass);
         } else {
+            if (MSGlobals::gLateralResolution > 0
+                    && (getLeftSideOnLane(lane) < 0 || getRightSideOnLane(lane) > lane->getWidth())) {
+                    // if ego is driving outside lane bounds we must consider
+                    // potential leaders that are also outside lane bounds
+                const bool outsideLeft = getLeftSideOnLane(lane) < 0;
+                if (outsideLeft) {
+                    ahead.setSublaneOffset(ceil(-getLeftSideOnLane(lane) / MSGlobals::gLateralResolution) * MSGlobals::gLateralResolution);
+                } else if (getRightSideOnLane(lane) > lane->getWidth()) {
+                    ahead.setSublaneOffset(-ceil((getRightSideOnLane(lane) - getWidth()) / MSGlobals::gLateralResolution) * MSGlobals::gLateralResolution);
+                }
+                for (const MSVehicle* cand : lane->getVehiclesSecure()) {
+                    if ((lane != myLane || cand->getPositionOnLane() > getPositionOnLane())
+                            && ((outsideLeft && cand->getLeftSideOnLane() < 0)
+                                || (!outsideLeft && cand->getRightSideOnEdge() > lane->getWidth()))) {
+                        ahead.addLeader(cand, true);
+#ifdef DEBUG_PLAN_MOVE
+                        if (DEBUG_COND) {
+                            std::cout << SIMTIME << " veh=" << getID() << " offset=" << ahead.getSublaneOffset() << " outsideLeft=" << outsideLeft << " outsideLeader=" << cand->getID() << "\n";
+                        }
+#endif
+                    }
+                }
+                lane->releaseVehicles();
+            }
             adaptToLeaders(ahead, lateralShift, seen, lastLink, leaderLane, v, vLinkPass);
         }
         if (lastLink != nullptr) {
@@ -2372,7 +2397,7 @@ MSVehicle::planMoveInternal(const SUMOTime t, MSLeaderInfo ahead, DriveItemVecto
         // check whether the lane or the shadowLane is a dead end (allow some leeway on intersections)
         if (lane->isLinkEnd(link)
                 || ((*link)->getViaLane() == nullptr
-                    && getLateralOverlap() > POSITION_EPS
+                    && getLateralOverlap() > POSITION_EPS && MSGlobals::gSublane
                     // do not get stuck on narrow edges
                     && getVehicleType().getWidth() <= lane->getEdge().getWidth()
                     // this is the exit link of a junction. The normal edge should support the shadow
@@ -2742,6 +2767,7 @@ MSVehicle::adaptToLeaders(const MSLeaderInfo& ahead, double latOffset,
                                   << " latOffset=" << latOffset
                                   << " rm=" << rightmost
                                   << " lm=" << leftmost
+                                  << " shift=" << ahead.getSublaneOffset()
                                   << " ahead=" << ahead.toString()
                                   << "\n";
 #endif
@@ -2843,7 +2869,7 @@ MSVehicle::adaptToLeader(const std::pair<const MSVehicle*, double> leaderInfo,
             backOnRoute = false;
             // this can either be
             // a) a merging situation (leader back is is not our route) or
-            // b) a minGap violation / collision 
+            // b) a minGap violation / collision
             MSLane* current = lastLink->myLink->getViaLaneOrLane();
             if (leaderInfo.first->getBackLane() == current) {
                 backOnRoute = true;
@@ -4046,6 +4072,12 @@ MSVehicle::executeMove() {
     // Determine vNext = speed after current sim step (ballistic), resp. in current simstep (euler)
     // Call to finalizeSpeed applies speed reduction due to dawdling / lane changing but ensures minimum safe speed
     double vNext = vSafe;
+    if (vNext <= SUMO_const_haltingSpeed && myWaitingTime > MSGlobals::gStartupWaitThreshold) {
+        myTimeSinceStartup = 0;
+    } else {
+        // identify potential startup (before other effects reduce the speed again)
+        myTimeSinceStartup += DELTA_T;
+    }
     if (myActionStep) {
         vNext = getCarFollowModel().finalizeSpeed(this, vSafe);
         if (vNext > 0) {
@@ -4943,6 +4975,7 @@ MSVehicle::enterLaneAtLaneChange(MSLane* enteredLane) {
     activateReminders(MSMoveReminder::NOTIFICATION_LANE_CHANGE, enteredLane);
     MSLane* lane = myLane;
     double leftLength = getVehicleType().getLength() - myState.myPos;
+    int deleteFurther = 0;
     for (int i = 0; i < (int)myFurtherLanes.size(); i++) {
         if (lane != nullptr) {
             lane = lane->getLogicalPredecessorLane(myFurtherLanes[i]->getEdge());
@@ -4954,21 +4987,36 @@ MSVehicle::enterLaneAtLaneChange(MSLane* enteredLane) {
             }
 #endif
             myFurtherLanes[i]->resetPartialOccupation(this);
-            myFurtherLanes[i] = lane;
-            myFurtherLanesPosLat[i] = myState.myPosLat;
+            // lane changing onto longer lanes may reduce the number of
+            // remaining further lanes
+            if (leftLength > 0) {
+                myFurtherLanes[i] = lane;
+                myFurtherLanesPosLat[i] = myState.myPosLat;
 #ifdef DEBUG_SETFURTHER
-            if (DEBUG_COND) {
-                std::cout << SIMTIME << " enterLaneAtLaneChange \n";
-            }
+                if (DEBUG_COND) {
+                    std::cout << SIMTIME << " enterLaneAtLaneChange \n";
+                }
 #endif
-            leftLength -= (lane)->setPartialOccupation(this);
-            myState.myBackPos = -leftLength;
+                leftLength -= (lane)->setPartialOccupation(this);
+                myState.myBackPos = -leftLength;
+            } else {
+                deleteFurther++;
+            }
         } else {
             // keep the old values, but ensure there is no shadow
             if (myLaneChangeModel->isChangingLanes()) {
                 myLaneChangeModel->setNoShadowPartialOccupator(myFurtherLanes[i]);
             }
         }
+    }
+    if (deleteFurther > 0) {
+#ifdef DEBUG_SETFURTHER
+        if (DEBUG_COND) {
+            std::cout << SIMTIME << " veh=" << getID() << " shortening myFurtherLanes by " << deleteFurther << "\n";
+        }
+#endif
+        myFurtherLanes.erase(myFurtherLanes.end() - 1);
+        myFurtherLanesPosLat.erase(myFurtherLanesPosLat.end() - 1);
     }
 #ifdef DEBUG_SETFURTHER
     if (DEBUG_COND) {
@@ -5996,6 +6044,24 @@ MSVehicle::setTentativeLaneAndPosition(MSLane* lane, double pos, double posLat) 
 double
 MSVehicle::getRightSideOnLane() const {
     return myState.myPosLat + 0.5 * myLane->getWidth() - 0.5 * getVehicleType().getWidth();
+}
+
+
+double
+MSVehicle::getLeftSideOnLane() const {
+    return myState.myPosLat + 0.5 * myLane->getWidth() + 0.5 * getVehicleType().getWidth();
+}
+
+
+double
+MSVehicle::getRightSideOnLane(const MSLane* lane) const {
+    return myState.myPosLat + 0.5 *lane->getWidth() - 0.5 * getVehicleType().getWidth();
+}
+
+
+double
+MSVehicle::getLeftSideOnLane(const MSLane* lane) const {
+    return myState.myPosLat + 0.5 * lane->getWidth() + 0.5 * getVehicleType().getWidth();
 }
 
 
@@ -7195,4 +7261,9 @@ MSVehicle::getStopArrivalDelay() const {
     }
 }
 
+
+const MSEdge*
+MSVehicle::getCurrentEdge() const {
+    return myLane != nullptr ? &myLane->getEdge() : getEdge();
+}
 /****************************************************************************/

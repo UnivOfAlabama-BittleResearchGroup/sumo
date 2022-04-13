@@ -1473,15 +1473,19 @@ def changePersonVClass(value):
     typeEnter()
 
 
-def changePersonPlan(personPlan):
+def changePersonPlan(personPlan, flow):
     """
     @brief change personPlan
     """
     # focus current frame
     focusOnFrame()
     # jump to person plan
-    for _ in range(16):
-        typeTab()
+    if (flow) :
+        for _ in range(23):
+            typeTab()
+    else:
+        for _ in range(16):
+            typeTab()
     # paste the new personPlan
     pasteIntoTextField(personPlan)
     # type enter to save change
@@ -1554,6 +1558,94 @@ def vehicleMode():
     typeKey('v')
     # wait for gl debug
     time.sleep(DELAY_CHANGEMODE)
+
+#################################################
+# vType elements
+#################################################
+
+def typeMode():
+    """
+    @brief change to type mode
+    """
+    typeKey('t')
+    # wait for gl debug
+    time.sleep(DELAY_CHANGEMODE)
+
+
+def createVType():
+    """
+    @brief create vType
+    """
+    # focus current frame
+    focusOnFrame()
+    # jump to stop type
+    for _ in range(attrs.type.buttons.create):
+        typeTab()
+    # type space
+    typeSpace()
+
+
+def deleteVType():
+    """
+    @brief delete vType
+    """
+    # focus current frame
+    focusOnFrame()
+    # jump to stop type
+    for _ in range(attrs.type.buttons.delete):
+        typeTab()
+    # type space
+    typeSpace()
+
+
+def copyVType():
+    """
+    @brief copy vType
+    """
+    # focus current frame
+    focusOnFrame()
+    # jump to stop type
+    for _ in range(attrs.type.buttons.copy):
+        typeTab()
+    # type space
+    typeSpace()
+
+
+def openVTypeDialog():
+    """
+    @brief create vType
+    """
+    # focus current frame
+    focusOnFrame()
+    # jump to stop type
+    for _ in range(attrs.type.buttons.dialog):
+        typeTab()
+    # type space
+    typeSpace()
+    # wait some second to question dialog
+    time.sleep(DELAY_QUESTION)
+
+
+def closeVTypeDialog():
+    """
+    @brief close vType dialog saving elements
+    """
+    typeTwoKeys('alt', 'a')
+
+
+def modifyVTypeAttribute(attributeNumber, value):
+    """
+    @brief modify VType attribute of type int/float/string
+    """
+    # focus dialog
+    typeTwoKeys('alt', 'f')
+    # jump to attribute
+    for _ in range(attributeNumber):
+        typeTab()
+    # paste the new value
+    pasteIntoTextField(value)
+    # type Enter to commit change
+    typeEnter()
 
 #################################################
 # delete

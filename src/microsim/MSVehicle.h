@@ -420,11 +420,29 @@ public:
         myCachedPosition = Position::INVALID;
     }
 
-    /** @brief Get the vehicle's lateral position on the lane:
+    /** @brief Get the lateral position of the vehicles right side on the lane:
      * @return The lateral position of the vehicle (in m distance between right
-     * side of vehicle and ride side of the lane it is on
+     * side of vehicle and right side of the lane it is on
      */
     double getRightSideOnLane() const;
+
+    /** @brief Get the lateral position of the vehicles left side on the lane:
+     * @return The lateral position of the vehicle (in m distance between left
+     * side of vehicle and right side of the lane it is on
+     */
+    double getLeftSideOnLane() const;
+
+    /** @brief Get the lateral position of the vehicles right side on the lane:
+     * @return The lateral position of the vehicle (in m distance between right
+     * side of vehicle and right side of the lane it is on
+     */
+    double getRightSideOnLane(const MSLane* lane) const;
+
+    /** @brief Get the lateral position of the vehicles left side on the lane:
+     * @return The lateral position of the vehicle (in m distance between left
+     * side of vehicle and right side of the lane it is on
+     */
+    double getLeftSideOnLane(const MSLane* lane) const;
 
     /** @brief Get the minimal lateral distance required to move fully onto the lane at given offset
      * @return The lateral distance to be covered to move the vehicle fully onto the lane (in m)
@@ -613,6 +631,10 @@ public:
      */
     bool isFrontOnLane(const MSLane* lane) const;
 
+    /** @brief Returns the edge the vehicle is currently at (possibly an
+     * internal edge or nullptr)
+     */
+    const MSEdge* getCurrentEdge() const;
 
     /** @brief Returns the starting point for reroutes (usually the current edge)
      *
@@ -631,6 +653,16 @@ public:
      */
     SUMOTime getWaitingTime() const {
         return myWaitingTime;
+    }
+
+    /** @brief Returns the SUMOTime spent driving since startup (speed was larger than 0.1m/s)
+     *
+     * The value is reset if the vehicle halts (moves slower than 0.1m/s)
+     * Intentional stopping does not reset the time
+     * @return The time the vehicle is standing
+     */
+    SUMOTime getTimeSinceStartup() const {
+        return myTimeSinceStartup;
     }
 
     /** @brief Returns the SUMOTime lost (speed was lesser maximum speed)
@@ -1880,6 +1912,9 @@ protected:
     SUMOTime myJunctionEntryTime;
     SUMOTime myJunctionEntryTimeNeverYield;
     SUMOTime myJunctionConflictEntryTime;
+
+    /// @brief duration of driving (speed > SUMO_const_haltingSpeed) after the last halting eposide
+    SUMOTime myTimeSinceStartup;
 
 protected:
 
