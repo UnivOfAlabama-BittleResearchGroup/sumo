@@ -126,6 +126,9 @@ public:
     /// @brief recalculate boundaries
     void recalculateBoundaries();
 
+    /// @brief confirm 3D view to viewport editor
+    bool is3DView() const;
+
     /// @brief builds the view toolbars
     virtual void buildViewToolBars(GUIGlChildWindow*);
 
@@ -190,6 +193,8 @@ public:
     long OnIdle(FXObject* sender, FXSelector sel, void* ptr);
 
 private:
+    double calculateRotation(const osg::Vec3d& lookFrom, const osg::Vec3d& lookAt, const osg::Vec3d& up);
+
     class SUMOTerrainManipulator : public osgGA::TerrainManipulator {
     public:
         SUMOTerrainManipulator() {

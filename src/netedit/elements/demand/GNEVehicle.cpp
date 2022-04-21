@@ -1211,7 +1211,18 @@ GNEVehicle::getAttribute(SumoXMLAttr key) const {
             }
         // Specific of vehicles
         case SUMO_ATTR_DEPART:
-            return time2string(depart);
+        case SUMO_ATTR_BEGIN:
+            if (departProcedure == DepartDefinition::TRIGGERED) {
+                return "triggered";
+            } else if (departProcedure == DepartDefinition::CONTAINER_TRIGGERED) {
+                return "containerTriggered";
+            } else if (departProcedure == DepartDefinition::SPLIT) {
+                return "split";
+            } else if (departProcedure == DepartDefinition::NOW) {
+                return "now";
+            } else {
+                return time2string(depart);
+            }
         case SUMO_ATTR_ROUTE:
             if (getParentDemandElements().size() == 2) {
                 return getParentDemandElements().at(1)->getID();
@@ -1243,8 +1254,6 @@ GNEVehicle::getAttribute(SumoXMLAttr key) const {
         case SUMO_ATTR_TOJUNCTION:
             return getParentJunctions().back()->getID();
         // Specific of flows
-        case SUMO_ATTR_BEGIN:
-            return time2string(depart);
         case SUMO_ATTR_END:
             return time2string(repetitionEnd);
         case SUMO_ATTR_VEHSPERHOUR:
@@ -1363,6 +1372,7 @@ GNEVehicle::setAttribute(SumoXMLAttr key, const std::string& value, GNEUndoList*
         case SUMO_ATTR_ARRIVALPOS_LAT:
         // Specific of vehicles
         case SUMO_ATTR_DEPART:
+        case SUMO_ATTR_BEGIN:
         case SUMO_ATTR_ROUTE:
         // Specific of from-to edges
         case SUMO_ATTR_FROM:
@@ -1374,7 +1384,6 @@ GNEVehicle::setAttribute(SumoXMLAttr key, const std::string& value, GNEUndoList*
         case SUMO_ATTR_FROMJUNCTION:
         case SUMO_ATTR_TOJUNCTION:
         // Specific of flows
-        case SUMO_ATTR_BEGIN:
         case SUMO_ATTR_END:
         case SUMO_ATTR_NUMBER:
         case SUMO_ATTR_VEHSPERHOUR:
@@ -1511,7 +1520,8 @@ GNEVehicle::isValid(SumoXMLAttr key, const std::string& value) {
             return error.empty();
         }
         // Specific of vehicles
-        case SUMO_ATTR_DEPART: {
+        case SUMO_ATTR_DEPART:
+        case SUMO_ATTR_BEGIN:{
             SUMOTime dummyDepart;
             DepartDefinition dummyDepartProcedure;
             parseDepart(value, toString(SUMO_TAG_VEHICLE), id, dummyDepart, dummyDepartProcedure, error);
@@ -1560,12 +1570,6 @@ GNEVehicle::isValid(SumoXMLAttr key, const std::string& value) {
         case SUMO_ATTR_TOJUNCTION:
             return SUMOXMLDefinitions::isValidNetID(value) && (myNet->getAttributeCarriers()->retrieveJunction(value, false) != nullptr);
         // Specific of flows
-        case SUMO_ATTR_BEGIN:
-            if (canParse<double>(value)) {
-                return (parse<double>(value) >= 0);
-            } else {
-                return false;
-            }
         case SUMO_ATTR_END:
             if (canParse<double>(value)) {
                 return (parse<double>(value) >= 0);
@@ -2003,7 +2007,8 @@ GNEVehicle::setAttribute(SumoXMLAttr key, const std::string& value) {
             parseArrivalPosLat(value, toString(SUMO_TAG_VEHICLE), id, arrivalPosLat, arrivalPosLatProcedure, error);
             break;
         // Specific of vehicles
-        case SUMO_ATTR_DEPART: {
+        case SUMO_ATTR_DEPART:
+        case SUMO_ATTR_BEGIN:{
             parseDepart(value, toString(SUMO_TAG_VEHICLE), id, depart, departProcedure, error);
             break;
         }
@@ -2053,9 +2058,15 @@ GNEVehicle::setAttribute(SumoXMLAttr key, const std::string& value) {
         case SUMO_ATTR_DEPARTEDGE: {
             // update depart edge
             if (value.empty()) {
+                // unset parameter
+                parametersSet &= ~VEHPARS_DEPARTEDGE_SET;
                 departEdge = -1;
+                departEdgeProcedure = RouteIndexDefinition::DEFAULT;
             } else {
+                // mark parameter as set
+                parametersSet |= VEHPARS_DEPARTEDGE_SET;
                 departEdge = parse<int>(value);
+                departEdgeProcedure = RouteIndexDefinition::GIVEN;
             }
             // compute vehicle
             if (getID().size() > 0) {
@@ -2067,9 +2078,15 @@ GNEVehicle::setAttribute(SumoXMLAttr key, const std::string& value) {
         case SUMO_ATTR_ARRIVALEDGE: {
             // update arrival edge
             if (value.empty()) {
-                arrivalEdge = 0;
+                // unset parameter
+                parametersSet &= ~VEHPARS_ARRIVALEDGE_SET;
+                arrivalEdge = -1;
+                arrivalEdgeProcedure = RouteIndexDefinition::DEFAULT;
             } else {
+                // mark parameter as set
+                parametersSet |= VEHPARS_ARRIVALEDGE_SET;
                 arrivalEdge = parse<int>(value);
+                arrivalEdgeProcedure = RouteIndexDefinition::GIVEN;
             }
             if (getID().size() > 0) {
                 // compute vehicle
@@ -2096,10 +2113,6 @@ GNEVehicle::setAttribute(SumoXMLAttr key, const std::string& value) {
             break;
         }
         // Specific of flows
-        case SUMO_ATTR_BEGIN: {
-            depart = string2time(value);
-            break;
-        }
         case SUMO_ATTR_END:
             repetitionEnd = string2time(value);
             break;

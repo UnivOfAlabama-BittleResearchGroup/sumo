@@ -28,19 +28,21 @@ import neteditTestFunctions as netedit  # noqa
 # Open netedit
 neteditProcess, referencePosition = netedit.setupAndStart(neteditTestRoot, ['--gui-testing-debug-gl'])
 
+# force save additionals
+netedit.forceSaveAdditionals()
+
 # go to demand mode
 netedit.supermodeDemand()
 
 # go to person mode
 netedit.personMode()
 
-# select personFlwo
+# change Person
 netedit.changeElement("personFlow")
 
 # create person using three edges
-netedit.leftClick(referencePosition, 274, 392)
-netedit.leftClick(referencePosition, 570, 250)
-netedit.leftClick(referencePosition, 180, 55)
+netedit.leftClick(referencePosition, 274, 400)
+netedit.leftClick(referencePosition, 180, 60)
 
 # press enter to create person
 netedit.typeEnter()
@@ -49,10 +51,10 @@ netedit.typeEnter()
 netedit.deleteMode()
 
 # change zoom
-netedit.setZoom("15", "20", "20")
+netedit.setZoom("0", "-6", "5")
 
 # delete person
-netedit.leftClick(referencePosition, 150, 295)
+netedit.leftClick(referencePosition, 310, 140)
 
 # Check undo
 netedit.undo(referencePosition, 1)
@@ -64,7 +66,7 @@ netedit.supermodeNetwork()
 netedit.deleteMode()
 
 # try to delete an edge with demand elements
-netedit.leftClick(referencePosition, 400, 295)
+netedit.leftClick(referencePosition, 570, 160)
 
 # wait warning
 netedit.waitDeleteWarning()
@@ -73,11 +75,11 @@ netedit.waitDeleteWarning()
 netedit.changeProtectDemandElements(referencePosition)
 
 # now delete edge with their person
-netedit.leftClick(referencePosition, 400, 295)
+netedit.leftClick(referencePosition, 570, 160)
 
 # Check undo
-netedit.undo(referencePosition, 2)
-netedit.redo(referencePosition, 2)
+netedit.undo(referencePosition, 1)
+netedit.redo(referencePosition, 1)
 
 # save network
 netedit.saveNetwork(referencePosition)

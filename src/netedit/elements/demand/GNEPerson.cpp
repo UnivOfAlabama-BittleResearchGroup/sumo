@@ -206,13 +206,8 @@ GNEPerson::getMoveOperation() {
 
 std::string
 GNEPerson::getBegin() const {
-    // obtain depart depending if is a Person, trip or routeFlow
-    std::string departStr;
-    if (myTagProperty.getTag() == SUMO_TAG_PERSONFLOW) {
-        departStr = toString(depart);
-    } else {
-        departStr = getDepart();
-    }
+    // obtain depart
+    std::string departStr = depart < 0 ? "0.00" : time2string(depart);
     // we need to handle depart as a tuple of 20 numbers (format: 000000...00<departTime>)
     departStr.reserve(20 - departStr.size());
     // add 0s at the beginning of departStr until we have 20 numbers
@@ -494,10 +489,19 @@ GNEPerson::getAttribute(SumoXMLAttr key) const {
             }
         // Specific of persons
         case SUMO_ATTR_DEPART:
-            return toString(depart);
-        // Specific of personFlows
         case SUMO_ATTR_BEGIN:
-            return time2string(depart);
+            if (departProcedure == DepartDefinition::TRIGGERED) {
+                return "triggered";
+            } else if (departProcedure == DepartDefinition::CONTAINER_TRIGGERED) {
+                return "containerTriggered";
+            } else if (departProcedure == DepartDefinition::SPLIT) {
+                return "split";
+            } else if (departProcedure == DepartDefinition::NOW) {
+                return "now";
+            } else {
+                return time2string(depart);
+            }
+        // Specific of personFlows
         case SUMO_ATTR_END:
             return time2string(repetitionEnd);
         case SUMO_ATTR_PERSONSPERHOUR:
@@ -583,8 +587,8 @@ GNEPerson::setAttribute(SumoXMLAttr key, const std::string& value, GNEUndoList* 
         case SUMO_ATTR_DEPARTPOS:
         // Specific of persons
         case SUMO_ATTR_DEPART:
-        // Specific of personFlows
         case SUMO_ATTR_BEGIN:
+        // Specific of personFlows
         case SUMO_ATTR_END:
         case SUMO_ATTR_NUMBER:
         case SUMO_ATTR_PERSONSPERHOUR:
@@ -623,25 +627,20 @@ GNEPerson::isValid(SumoXMLAttr key, const std::string& value) {
         case SUMO_ATTR_DEPARTPOS: {
             double dummyDepartPos;
             DepartPosDefinition dummyDepartPosProcedure;
-            parseDepartPos(value, toString(SUMO_TAG_VEHICLE), id, dummyDepartPos, dummyDepartPosProcedure, error);
+            parseDepartPos(value, toString(SUMO_TAG_PERSON), id, dummyDepartPos, dummyDepartPosProcedure, error);
             // if error is empty, given value is valid
             return error.empty();
         }
         // Specific of persons
-        case SUMO_ATTR_DEPART: {
-            if (canParse<double>(value)) {
-                return (parse<double>(value) >= 0);
-            } else {
-                return false;
-            }
+        case SUMO_ATTR_DEPART:
+        case SUMO_ATTR_BEGIN:{
+            SUMOTime dummyDepart;
+            DepartDefinition dummyDepartProcedure;
+            parseDepart(value, toString(SUMO_TAG_PERSON), id, dummyDepart, dummyDepartProcedure, error);
+            // if error is empty, given value is valid
+            return error.empty();
         }
         // Specific of personflows
-        case SUMO_ATTR_BEGIN:
-            if (canParse<double>(value)) {
-                return (parse<double>(value) >= 0);
-            } else {
-                return false;
-            }
         case SUMO_ATTR_END:
             if (canParse<double>(value)) {
                 return (parse<double>(value) >= 0);
@@ -849,9 +848,11 @@ GNEPerson::setAttribute(SumoXMLAttr key, const std::string& value) {
             }
             break;
         case SUMO_ATTR_TYPE:
-            replaceDemandElementParent(SUMO_TAG_VTYPE, value, 0);
-            // set manually vtypeID (needed for saving)
-            vtypeid = value;
+            if (getID().size() > 0) {
+                replaceDemandElementParent(SUMO_TAG_VTYPE, value, 0);
+                // set manually vtypeID (needed for saving)
+                vtypeid = value;
+            }
             break;
         case SUMO_ATTR_COLOR:
             if (!value.empty() && (value != myTagProperty.getDefaultValue(key))) {
@@ -867,12 +868,12 @@ GNEPerson::setAttribute(SumoXMLAttr key, const std::string& value) {
             break;
         case SUMO_ATTR_DEPARTPOS:
             if (!value.empty() && (value != myTagProperty.getDefaultValue(key))) {
-                parseDepartPos(value, toString(SUMO_TAG_VEHICLE), id, departPos, departPosProcedure, error);
+                parseDepartPos(value, toString(SUMO_TAG_PERSON), id, departPos, departPosProcedure, error);
                 // mark parameter as set
                 parametersSet |= VEHPARS_DEPARTPOS_SET;
             } else {
                 // set default value
-                parseDepartPos(myTagProperty.getDefaultValue(key), toString(SUMO_TAG_VEHICLE), id, departPos, departPosProcedure, error);
+                parseDepartPos(myTagProperty.getDefaultValue(key), toString(SUMO_TAG_PERSON), id, departPos, departPosProcedure, error);
                 // unset parameter
                 parametersSet &= ~VEHPARS_DEPARTPOS_SET;
             }
@@ -880,15 +881,12 @@ GNEPerson::setAttribute(SumoXMLAttr key, const std::string& value) {
             updateGeometry();
             break;
         // Specific of persons
-        case SUMO_ATTR_DEPART: {
-            parseDepart(value, toString(SUMO_TAG_VEHICLE), id, depart, departProcedure, error);
+        case SUMO_ATTR_DEPART:
+        case SUMO_ATTR_BEGIN: {
+            parseDepart(value, toString(SUMO_TAG_PERSON), id, depart, departProcedure, error);
             break;
         }
         // Specific of personFlows
-        case SUMO_ATTR_BEGIN: {
-            depart = string2time(value);
-            break;
-        }
         case SUMO_ATTR_END:
             repetitionEnd = string2time(value);
             break;

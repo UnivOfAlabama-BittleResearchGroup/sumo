@@ -53,7 +53,6 @@ GNEVType::GNEVType(GNENet* net, const std::string& vTypeID, const SUMOVehicleCla
     myDefaultVehicleTypeModified(false) {
     // set default vehicle class
     vehicleClass = defaultVClass;
-    parametersSet |= VTYPEPARS_VEHICLECLASS_SET;
     // init Rail Visualization Parameters
     initRailVisualizationParameters();
 }
@@ -96,7 +95,7 @@ void
 GNEVType::writeDemandElement(OutputDevice& device) const {
     // only write default vehicle types if it was modified
     if (myDefaultVehicleType) {
-        if (myDefaultVehicleTypeModified) {
+        if (myDefaultVehicleTypeModified || (getParentDemandElements().size() > 0)) {
             write(device);
         }
     } else {

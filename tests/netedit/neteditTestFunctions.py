@@ -1052,9 +1052,9 @@ def checkParameters(referencePosition, attributeNumber, overlapped):
     # Change generic parameters with a valid value
     modifyAttribute(attributeNumber, "keyFinal1=value1|keyFinal2=value2|keyFinal3=value3", overlapped)
     # Check undo
-    undo(referencePosition, 10)
+    undo(referencePosition, 8)
     # Check redo
-    redo(referencePosition, 10)
+    redo(referencePosition, 8)
 
 
 def checkDoubleParameters(referencePosition, attributeNumber, overlapped, posX=0, posY=0):
@@ -1388,7 +1388,7 @@ def fixStoppingPlace(solution):
         typeSpace()
 
 #################################################
-# route elements
+# demand elements
 #################################################
 
 
@@ -1429,6 +1429,21 @@ def changeRouteVClass(value):
     pasteIntoTextField(value)
     # type enter to save change
     typeEnter()
+
+
+def fixDemandElement(value):
+    """
+    @brief fix demand element
+    """
+    # focus current frame
+    focusOnFrame()
+    # jump to option
+    for _ in range(value):
+        typeInvertTab()
+    # type space to select
+    typeSpace()
+    # accept
+    typeTwoKeys('alt', 'a')
 
 #################################################
 # person elements
@@ -1480,7 +1495,7 @@ def changePersonPlan(personPlan, flow):
     # focus current frame
     focusOnFrame()
     # jump to person plan
-    if (flow) :
+    if (flow):
         for _ in range(23):
             typeTab()
     else:
@@ -1562,6 +1577,7 @@ def vehicleMode():
 #################################################
 # vType elements
 #################################################
+
 
 def typeMode():
     """
