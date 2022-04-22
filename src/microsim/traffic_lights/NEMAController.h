@@ -214,24 +214,6 @@ public:
     /// @brief override Function to Simplify Accessing Offset Cycle Time
     inline SUMOTime getTimeInCycle() const { return (simTime - cycleRefPoint - offset) % myCycleLength; };
 
-    /**
-     * @brief Accessory function to simplify calls to coordModeCycle<controller type>
-     * returns the ring distance to the coordination time
-     * 
-     * @param phase a pointer to the phase that we wish to calculate the coordinated phase mode cycle for
-     * @return SUMOTime 
-     */
-    SUMOTime coordModeCycle(PhasePtr phase) {
-        switch (myControllerType) {
-        case Type170:
-            return coordModeCycle170(phase);
-        case TS2:
-            return coordModeCycleTS2(phase);
-        default:
-            // Default to Type 170
-            return coordModeCycle170(phase);
-        }
-    };
 
     /// @brief set the active phase
     void setActivePhase(PhasePtr phase);
@@ -309,6 +291,9 @@ protected:
     SUMOTime myCycleLength;
     /// @brief the next cycle length (set by traci)
     SUMOTime myNextCycleLength;
+
+    /// @brief store whether green rest is desired
+    bool greenRest;
 
 
     /// @brief stores the simulation time to make it easily accessible
@@ -469,9 +454,6 @@ protected:
     /// @brief virtual phase that holds the current state
     MSPhaseDefinition myPhase;
 
-    // Green Transfer Option
-    bool greenTransfer;
-
     /**
      * @brief throw an InvalidArgument error if the param_name is not set
      * 
@@ -535,12 +517,6 @@ protected:
             return calculateInitialPhases170();
         }
     }
-
-    /// @brief TS2 Specific Coordinated Mode Cycle
-    SUMOTime coordModeCycleTS2(PhasePtr phase);
-    /// @brief Type170 Specific Coordinated Mode Cycle
-    SUMOTime coordModeCycle170(PhasePtr phase);
-
 };
 
 
