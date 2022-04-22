@@ -292,10 +292,6 @@ protected:
     /// @brief the next cycle length (set by traci)
     SUMOTime myNextCycleLength;
 
-    /// @brief store whether green rest is desired
-    bool greenRest;
-
-
     /// @brief stores the simulation time to make it easily accessible
     SUMOTime simTime = 0;
 

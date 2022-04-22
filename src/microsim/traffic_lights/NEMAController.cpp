@@ -87,7 +87,6 @@ NEMALogic::NEMALogic(MSTLLogicControl& tlcontrol,
     myNextOffset = offset;
     whetherOutputState = StringUtils::toBool(getParameter("whetherOutputState", "false"));
     coordinateMode = StringUtils::toBool(getParameter("coordinate-mode", "false"));
-    greenRest = StringUtils::toBool(getParameter("greenRest", "true"));
 
     //missing parameter error
     error_handle_not_set(ring1, "ring1");
@@ -211,8 +210,8 @@ NEMALogic::constructTimingAndPhaseDefs(std::string& barriers, std::string& coord
                 bool minRecall = vectorContainsPhase(VecMinRecall, p);
                 bool maxRecall = vectorContainsPhase(VecMaxRecall, p);
                 // A phase can "green rest" only if it has a recall and no other phases on that ring do OR if NO phases have a recall (unique case) 
-                bool phaseGreenRest = ((VecMaxRecall.size() + VecMinRecall.size()) < 1) && greenRest;
-                if (!phaseGreenRest && greenRest){
+                bool phaseGreenRest = ((VecMaxRecall.size() + VecMinRecall.size()) < 1);
+                if (!phaseGreenRest){
                     bool recallActive = minRecall || maxRecall;
                     if (recallActive){
                         for (const auto& pO : r){
@@ -310,7 +309,6 @@ NEMALogic::constructTimingAndPhaseDefs(std::string& barriers, std::string& coord
     }
 
 
-
 #ifdef DEBUG_NEMA
     //print to check the rings and barriers active phase
     std::cout << "After init, active ring1 phase is " << myActivePhaseObjs[0]->phaseName << std::endl;
@@ -329,6 +327,7 @@ NEMALogic::constructTimingAndPhaseDefs(std::string& barriers, std::string& coord
         std::cout << "state = " << std::to_string((int)p->getCurrentState()) << std::endl;
     }
 #endif
+
 
 #ifdef DEBUG_NEMA
     std::cout << "After init, r1/r2 barrier phase = " << defaultBarrierPhases[0][1]->phaseName << " and " << defaultBarrierPhases[1][1]->phaseName << std::endl;
