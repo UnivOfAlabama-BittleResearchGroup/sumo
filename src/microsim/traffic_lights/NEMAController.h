@@ -62,7 +62,7 @@ enum class LightState {
  */
 class NEMALogic : public MSSimpleTrafficLightLogic {
 public:
-    
+
     typedef NEMAPhase* PhasePtr;
 
     typedef std::map<MSLane*, MSE2Collector*> LaneDetectorMap;
@@ -77,8 +77,8 @@ public:
     };
 
     enum controllerType {
-       Type170,
-       TS2
+        Type170,
+        TS2
     };
 
     typedef std::vector<transitionInfo> TransitionPairs;
@@ -151,49 +151,49 @@ public:
      * @return SUMOTime
      */
     SUMOTime ModeCycle(SUMOTime a, SUMOTime b);
-    
+
 
     /**
-     * @brief returns the IDs of the phase's controlled lanes. 
+     * @brief returns the IDs of the phase's controlled lanes.
      * Found by looking for the "G" in the light state string
-     * 
+     *
      * @param state the light state string
-     * @return std::set<std::string> 
+     * @return std::set<std::string>
      */
     std::set<std::string> getLaneIDsFromNEMAState(std::string state);
 
     /**
-     * @brief Set the max green of all phases. 
-     * 
+     * @brief Set the max green of all phases.
+     *
      * @param newMaxGreens a vector of new max green times. Must be length 8
      */
     void setNewMaxGreens(std::vector<double> newMaxGreens);
 
     /**
      * @brief Set the new splits of all phases
-     * 
+     *
      * @param newSplits a vector of new splits. Must be length 8
      */
     void setNewSplits(std::vector<double> newSplits);
 
     /**
      * @brief set the new cycle length for the controller
-     * 
-     * @param newCycleLength 
+     *
+     * @param newCycleLength
      */
     void setNewCycleLength(double newCycleLength);
-    
+
     /**
      * @brief Set the new offset for the controller
-     * 
-     * @param newOffset 
+     *
+     * @param newOffset
      */
     void setNewOffset(double newOffset);
 
     /**
-     * @brief Get the current cycle length 
-     * 
-     * @return SUMOTime 
+     * @brief Get the current cycle length
+     *
+     * @return SUMOTime
      */
     SUMOTime getCurrentCycleLength() {
         return myCycleLength;
@@ -220,24 +220,24 @@ public:
 
     /**
      * @brief Get the Active Phase object for a specified ring
-     * 
-     * @param ringNum 
-     * @return PhasePtr 
+     *
+     * @param ringNum
+     * @return PhasePtr
      */
     inline PhasePtr getActivePhase(int ringNum) { return myActivePhaseObjs[ringNum]; };
 
     /**
      * @brief get all phases for a given ring
-     * 
-     * @param ringNum 
-     * @return std::vector<PhasePtr> 
+     *
+     * @param ringNum
+     * @return std::vector<PhasePtr>
      */
     std::vector<PhasePtr> getPhasesByRing(int ringNum);
 
     /**
      * @brief get the phase object matching the phaseNum
      * If ringNum is passed, it will only search for the phase in the given ring
-     * 
+     *
      * @param phaseNum an integer corresponding to the phase
      * @param ringNum the ring to search for the phase in. Defaults to -1, meaning both rings will be searched
      * @return PhasePtr (NEMAPhase*)
@@ -246,47 +246,60 @@ public:
 
     /**
      * @brief get a vector of all phase objects
-     * 
-     * @return std::vector<PhasePtr> 
+     *
+     * @return std::vector<PhasePtr>
      */
     inline std::vector<PhasePtr> getPhaseObjs(void) { return myPhaseObjs; };
 
     /**
      * @brief return the ring distance between two phases
-     * 
+     *
      * @param p1 phase 1
      * @param p2 phase 2
      * @param ringNum the ring on which to measure the phase distance
-     * @return int 
+     * @return int
      */
     int measureRingDistance(int p1, int p2, int ringNum);
 
     /**
      * @brief checks if the controller is of type170
-     * 
+     *
      * @return true if myControllerType == Type170
-     * @return false 
+     * @return false
      */
     inline bool isType170(void) const { return myControllerType == Type170; };
 
     /**
      * @brief Get the opposite active phase
-     * 
-     * @param p a pointer to the known phase 
-     * @return PhasePtr 
+     *
+     * @param p a pointer to the known phase
+     * @return PhasePtr
      */
     PhasePtr getOtherPhase(PhasePtr p);
 
     /// @brief whether the controller is in coordinated mode or not
     bool coordinateMode;
 
+    /**
+     * @brief implement any pending traci changes
+     * This function is called once per cycle
+     */
+    void implementTraciChanges(void);
+
+    /// @brief a store of the coordinated phase objects. Only used meaningfully when the controller is 
+    /// in coordinated mode
+    PhasePtr coordinatePhaseObjs[2];
+
 protected:
-    
+
+    /// @brief flag to keep track of whether a timing change has been requested via traci
+    bool queuedTraciChanges;
+
     /// @brief the controller's offset
     SUMOTime offset;
     /// @brief the next offset to implement
     SUMOTime myNextOffset;
-    
+
     /// @brief the coordinated cycle length
     SUMOTime myCycleLength;
     /// @brief the next cycle length (set by traci)
@@ -301,23 +314,22 @@ protected:
     // / @brief variable to store the active phases
     PhasePtr myActivePhaseObjs[2] = { nullptr, nullptr };
 
-    // / @brief a vector that stores a pointer to the instantiated NEMAPhase objects
+    /// @brief a vector that stores a pointer to the instantiated NEMAPhase objects
     std::vector<PhasePtr > myPhaseObjs;
-    
+
+    /// @brief an array to store the phases located at a barrier for each ring
     PhasePtr defaultBarrierPhases[2][2];
 
-    PhasePtr coordinatePhaseObjs[2];
-
-    /** 
+    /**
      * Construct Timing and Phase Defs
-     * @brief constructs phase using the configuration file 
+     * @brief constructs phase using the configuration file
      * @param barriers a string of barrier phases ("4,8")
      * @param coordinates a string of coordinated phases ("2,6")
      * @param ring1 a string of phases in ring 1 ("1,2,3,4")
      * @param ring2 a string of phases in ring 2 ("5,6,7,8")
      */
-    void constructTimingAndPhaseDefs(std::string& barriers, std::string& coordinates, 
-                                    std::string& ring1, std::string& ring2);
+    void constructTimingAndPhaseDefs(std::string& barriers, std::string& coordinates,
+        std::string& ring1, std::string& ring2);
 
     /** @brief iterates over the two active phases (myActivePhaseObjs) and merges the two active phases
      * @return std::string the light string to implement (GGGrrrGGGrrr)
@@ -354,18 +366,18 @@ protected:
     bool hasMajor(const std::string& state, const LaneVector& lanes) const;
 
     /**
-     * @brief converts a comma seperated string into a integer vector 
+     * @brief converts a comma seperated string into a integer vector
      * "1,2,3,4" -> {1,2,3,4}
-     * 
+     *
      * @param s the string of comma seperated integers
-     * @return std::vector<int> 
+     * @return std::vector<int>
      */
     std::vector<int> readParaFromString(std::string s);
 
     /**
      * @brief decide whether the detector is for left turn lane
-     * if it is, use the detector length for left turn lane 
-     * 
+     * if it is, use the detector length for left turn lane
+     *
      * @param lane a pointer to the lane
      * @return whether a lane is a left turn or not
      */
@@ -429,7 +441,7 @@ protected:
 
     /**
      * @brief return the default transition for t give it's and the ot's state
-     * 
+     *
      * @param t the target phase
      * @param ot the other active phase
      * @return PhaseTransitionLogic* the transition logic describing this transition
@@ -441,9 +453,9 @@ protected:
 
     /**
      * @brief parse the controllerType from the tllogic description
-     * 
-     * @param inputType 
-     * @return controllerType 
+     *
+     * @param inputType
+     * @return controllerType
      */
     controllerType parseControllerType(std::string inputType);
 
@@ -452,30 +464,23 @@ protected:
 
     /**
      * @brief throw an InvalidArgument error if the param_name is not set
-     * 
+     *
      * @param param_variable the value of param_name
      * @param param_name  the name of the parameter
      */
     void error_handle_not_set(std::string param_variable, std::string param_name);
-    
+
     /**
-     * @brief validates the NEMA timing. 
+     * @brief validates the NEMA timing.
      * Writes warnings if ignoreError set to true else throws ProcessError
-     * 
+     *
      */
     void validate_timing();
 
     /**
-     * @brief implement any pending traci changes
-     * This function is called once per cycle
-     * 
-     */
-    void implementTraciChanges(void);
-
-    /**
      * @brief calculate the forceOffs for a TS2 style offset
      * From https://ops.fhwa.dot.gov/publications/fhwahop08024/chapter6.htm#6.3
-     * 
+     *
      */
     void calculateForceOffsTS2();
     /**
@@ -483,7 +488,7 @@ protected:
      * From https://ops.fhwa.dot.gov/publications/fhwahop08024/chapter6.htm#6.3
      */
     void calculateForceOffs170();
-    
+
     /// @brief directs the code to the correct force off function accorifing to its cabinet type
     void calculateForceOffs() {
         switch (myControllerType) {
@@ -519,9 +524,9 @@ protected:
 /**
  * @class NEMAPhase
  * @brief One phase in the NEMAController
- * 
+ *
  * This represents one phase and all its parameters in a NEMA traffic light
- * The phse ultimately controls it's transition to the next phase, 
+ * The phse ultimately controls it's transition to the next phase,
  * and is resbonisble for determining the valid transitions given it's current state
  */
 class NEMAPhase {
@@ -562,7 +567,7 @@ public:
 
     /**
      * @brief Construct a new NEMAPhase object
-     * 
+     *
      * @param phaseName the "name" of the phase as an integer
      * @param isBarrier if the phase is located at a barrier or not
      * @param isGreenRest if it is a phase in which the traffic signal can green rest
@@ -603,7 +608,7 @@ public:
     // Build a Map of Valid Transitions and store the detector-based information
     /**
      * @brief initializes the object
-     * 
+     *
      * @param controller a pointer to the controller object
      * @param crossPhaseTarget the cross phase switching target
      * @param crossPhaseSource the cross phase switching source
@@ -613,14 +618,14 @@ public:
 
     /**
      * @brief update is called on the active phases by the NEMAController at every time step
-     * 
+     *
      * @param controller a reference to the controller
      */
     void update(NEMALogic* controller);
 
     /**
      * @brief handles the transition out of a phase into the next (puts the phase through (G -> Y -> R) transition
-     * 
+     *
      * @param controller a reference to the NEMAController
      * @param nextPhases the next phases that the controller wants to transition to
      */
@@ -637,7 +642,7 @@ public:
 
     /// @brief Check Detectors. Called on all phases at every step
     void checkMyDetectors(void);
-    
+
     /// @brief Clear My Detectors. Called on all phases at every step
     void clearMyDetectors(void);
 
@@ -651,6 +656,10 @@ public:
     bool maxRecall;
     bool fixForceOff;
     int ringNum;
+
+    /// @brief store the last detect check for traci purposes 
+    bool lastDetectActive;
+
     /// @brief a count down timer to track green rest transition time
     SUMOTime greenRestTimer;
     SUMOTime greatestStartTime;
@@ -662,9 +671,9 @@ public:
 
     /**
      * @brief Get the Transition Time
-     * 
-     * @param controller 
-     * @return SUMOTime 
+     *
+     * @param controller
+     * @return SUMOTime
      */
     SUMOTime getTransitionTime(NEMALogic* controller);
 
@@ -676,17 +685,17 @@ public:
 
     /**
      * @brief calculate a vector of potention next phases
-     * 
-     * @param controller 
-     * @return std::vector<PhaseTransitionLogic*> 
+     *
+     * @param controller
+     * @return std::vector<PhaseTransitionLogic*>
      */
     std::vector<PhaseTransitionLogic*> trySwitch(NEMALogic* controller);
 
     /**
      * @brief return the PhaseTransitionLogic matching the toPhase
-     * 
+     *
      * @param toPhase a integer representing the target phase
-     * @return PhaseTransitionLogic* 
+     * @return PhaseTransitionLogic*
      */
     PhaseTransitionLogic* getTransition(int toPhase);
 
@@ -734,9 +743,9 @@ private:
 
     /**
      * @brief Applies the vehicle extension timer if appropriate
-     * 
+     *
      * @param duration the current phase duration
-     * @return SUMOTime 
+     * @return SUMOTime
      */
     SUMOTime calcVehicleExtension(SUMOTime duration);
 
@@ -746,7 +755,7 @@ private:
     /**
      * @brief handles entry to the phase during simulation
      * Sets the color to green and determines maximum duration
-     * 
+     *
      * @param controller a reference to the controller
      * @param lastPhase a reference to the last phase
      */
@@ -765,9 +774,9 @@ private:
  * @class PhaseTransitionLogic
  * @brief This class handles the transition logic between two phases
  *
- * This is intended to be extensible in the future. Each phase stores some 
+ * This is intended to be extensible in the future. Each phase stores some
  * number of PhaseTransitionLogics, equal to the number of non-zero phases in a ring
- * 
+ *
  */
 class PhaseTransitionLogic {
 public:
@@ -776,7 +785,7 @@ public:
 
     /**
      * @brief Construct a new Phase Transition Logic object
-     * 
+     *
      * @param fromPhase the phase who "owns" this transition
      * @param toPhase the phase to which I represent a transition to
      */
@@ -788,18 +797,18 @@ public:
     /**
      * @brief This function is the main PhaseTransitionLogic function
      * It is called by the fromPhase to check if a transition to the toPhase is acceptable
-     * 
+     *
      * @param controller a reference to the controller
-     * @return true 
-     * @return false 
+     * @return true
+     * @return false
      */
     bool okay(NEMALogic* controller);
 
     /**
      * @brief return the ring distance that this transition represents
-     * 
+     *
      * @param otherTrans the other PhaseTransitionLogic
-     * @return int 
+     * @return int
      */
     int getDistance(PhaseTransitionLogic* otherTrans);
     /// @brief set the transition distance
@@ -807,7 +816,7 @@ public:
     int distance;
 
     /// @brief deconstructor
-    ~PhaseTransitionLogic(){};
+    ~PhaseTransitionLogic() {};
 
     /// @brief get the to phase
     inline PhasePtr getToPhase(void) const { return toPhase; };
@@ -820,44 +829,44 @@ private:
 
     /// @brief build the transition logic based on the from and to phase
     void buildLogic(void);
-    
+
     /**
-     * @brief If the fromPhase is at a barrier, then this function 
+     * @brief If the fromPhase is at a barrier, then this function
      * will be called to check whether the transition is valid
-     * 
+     *
      * @param controller a reference to the controller
-     * @return true 
-     * @return false 
+     * @return true
+     * @return false
      */
     bool fromBarrier(NEMALogic* controller);
 
     /**
-     * @brief if the fromPhase is a coordinated phase, then 
+     * @brief if the fromPhase is a coordinated phase, then
      * this logic will be checked
-     * 
-     * @param controller 
-     * @return true 
-     * @return false 
+     *
+     * @param controller
+     * @return true
+     * @return false
      */
     bool fromCoord(NEMALogic* controller);
 
     /**
-     * @brief this represents the bare minimum logic, 
+     * @brief this represents the bare minimum logic,
      * that the toPhase has an active detector and that the fromPhase is ready to switch
-     * 
-     * @param controller 
-     * @return true 
-     * @return false 
+     *
+     * @param controller
+     * @return true
+     * @return false
      */
     bool freeBase(NEMALogic* controller);
 
     /**
-     * @brief represents the bare minimum coordinate mode logic. 
+     * @brief represents the bare minimum coordinate mode logic.
      * Requires that the toPhase can fit its minimum green time before the force off
-     * 
-     * @param controller 
-     * @return true 
-     * @return false 
+     *
+     * @param controller
+     * @return true
+     * @return false
      */
     bool coordBase(NEMALogic* controller);
 };
